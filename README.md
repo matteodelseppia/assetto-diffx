@@ -39,6 +39,7 @@ Examples:
 
 ## Features
 
+- **Commit range picker** — Choose the base and compare commits from the toolbar; the diff reloads in place, no restart or page refresh
 - **Split / Unified view** — Toggle between side-by-side and inline diff
 - **Syntax highlighting** — Powered by Shiki with GitHub themes
 - **File tree** — Hierarchical file browser with search filter and file change-type icons
@@ -52,6 +53,18 @@ Examples:
 - **Custom diff commands** — Pass any `git diff` arguments after `--`
 - **EditorConfig support** — Respects `.editorconfig` for per-file tab size
 - **Persistent settings** — Your preferences are saved across sessions
+
+## Choosing what to review
+
+The toolbar's range picker lists the repository's recent commits. Pick a **base**
+commit and a **compare** end — either another commit or the working tree — and
+the diff is recomputed without reloading the page. "Reset" returns to what the
+CLI was started with (the working tree, or the custom `git diff` arguments).
+
+Review comments are meant for a coding agent that edits the working tree, so a
+comment on an added line that no longer exists in the current version of the
+file is refused; the UI explains why. Comments on deleted lines are always
+allowed, since deleted code is absent by definition.
 
 ## Comment Output Format
 

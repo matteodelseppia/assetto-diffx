@@ -15,3 +15,11 @@ export interface ReviewComment {
   createdAt: number
   replies: CommentReply[]
 }
+
+export interface CommitSummary {
+  sha: string
+  shortSha: string
+  subject: string
+  author: string
+  date: string
+}

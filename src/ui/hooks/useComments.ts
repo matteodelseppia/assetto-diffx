@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { DiffLineAnnotation } from '@pierre/diffs'
 import type { ReviewComment } from '../../types'
@@ -12,6 +12,7 @@ async function fetchComments(): Promise<ReviewComment[]> {
 
 export function useComments() {
   const queryClient = useQueryClient()
+  const [addError, setAddError] = useState<string | null>(null)
   const { data: comments = [] } = useQuery({ queryKey: COMMENTS_KEY, queryFn: fetchComments, refetchInterval: 3000 })
 
   const addMutation = useMutation({
@@ -21,10 +22,18 @@ export function useComments() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params),
       })
-      return res.json() as Promise<ReviewComment>
+      const json = await res.json()
+      if (!res.ok) {
+        throw new Error(json?.error ?? `Could not save the comment (HTTP ${res.status})`)
+      }
+      return json as ReviewComment
     },
     onSuccess: (comment) => {
+      setAddError(null)
       queryClient.setQueryData<ReviewComment[]>(COMMENTS_KEY, (prev = []) => [...prev, comment])
+    },
+    onError: (err: Error) => {
+      setAddError(err.message)
     },
   })
 
@@ -60,6 +69,8 @@ export function useComments() {
     },
     [addMutation],
   )
+
+  const dismissAddError = useCallback(() => setAddError(null), [])
 
   const removeComment = useCallback(
     (id: string) => {
@@ -129,6 +140,8 @@ export function useComments() {
 
   return {
     comments,
+    addError,
+    dismissAddError,
     addComment,
     removeComment,
     editComment,

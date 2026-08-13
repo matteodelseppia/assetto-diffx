@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { rangeParams, type CommitRange } from './useCommits'
 
 export interface BinaryFileInfo {
   path: string
@@ -10,6 +11,7 @@ interface DiffData {
   repoName: string
   branch: string
   customMode: boolean
+  rangeMode: boolean
   binaryFiles: BinaryFileInfo[]
   tabSizeMap: Record<string, number>
   untrackedFiles: string[]
@@ -20,16 +22,23 @@ export interface DiffOptions {
   untracked: boolean
 }
 
-export function useDiff(options: DiffOptions) {
+export function useDiff(options: DiffOptions, range: CommitRange) {
   const [data, setData] = useState<DiffData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { base, head } = range
 
   useEffect(() => {
     setLoading(true)
     setError(null)
 
-    fetch(`/api/diff?staged=${options.staged}&untracked=${options.untracked}`)
+    const params = new URLSearchParams({
+      staged: String(options.staged),
+      untracked: String(options.untracked),
+      ...rangeParams({ base, head }),
+    })
+
+    fetch(`/api/diff?${params}`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
@@ -37,13 +46,14 @@ export function useDiff(options: DiffOptions) {
       .then((json) => setData(json))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
-  }, [options.staged, options.untracked])
+  }, [options.staged, options.untracked, base, head])
 
   return {
     patch: data?.patch ?? null,
     repoName: data?.repoName ?? '',
     branch: data?.branch ?? '',
     customMode: data?.customMode ?? false,
+    rangeMode: data?.rangeMode ?? false,
     binaryFiles: data?.binaryFiles ?? [],
     tabSizeMap: data?.tabSizeMap ?? {},
     untrackedFiles: data?.untrackedFiles ?? [],

@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { GitBranch, Settings } from 'lucide-react'
 import type { DiffOptions } from '../hooks/useDiff'
+import type { CommitSummary } from '../../types'
+import type { CommitRange } from '../hooks/useCommits'
+import { CommitRangePicker } from './CommitRangePicker'
 
 interface ToolbarProps {
   repoName: string
@@ -15,6 +18,10 @@ interface ToolbarProps {
   softWrap: boolean
   browser?: string
   customMode: boolean
+  rangeMode: boolean
+  commits: CommitSummary[]
+  range: CommitRange
+  onRangeChange: (range: CommitRange) => void
   onDiffStyleChange: (style: 'split' | 'unified') => void
   onDiffOptionsChange: (options: DiffOptions) => void
   onDefaultTabSizeChange: (size: number) => void
@@ -36,6 +43,10 @@ export function Toolbar({
   softWrap,
   browser,
   customMode,
+  rangeMode,
+  commits,
+  range,
+  onRangeChange,
   onDiffStyleChange,
   onDiffOptionsChange,
   onDefaultTabSizeChange,
@@ -82,6 +93,12 @@ export function Toolbar({
         </span>
       </div>
       <div className="toolbar-right">
+        <CommitRangePicker
+          commits={commits}
+          range={range}
+          defaultLabel={customMode ? 'CLI diff' : 'Working tree'}
+          onChange={onRangeChange}
+        />
         <div className="toolbar-toggle">
           <button
             className={`btn btn-sm ${diffStyle === 'split' ? 'btn-active' : ''}`}
@@ -106,7 +123,7 @@ export function Toolbar({
           </button>
           {settingsOpen && (
             <div className="settings-menu">
-              {!customMode && (
+              {!customMode && !rangeMode && (
                 <>
                   <label className="settings-item">
                     <input

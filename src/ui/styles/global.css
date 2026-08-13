@@ -238,6 +238,101 @@ body {
     overflow: hidden;
 }
 
+/* Commit range picker */
+.range-picker {
+    position: relative;
+}
+
+.range-picker-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 320px;
+}
+
+.range-picker-summary {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.range-picker-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    width: 380px;
+    max-width: 90vw;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 200;
+    padding: 8px 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .range-picker-menu {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+}
+
+.range-picker-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 12px;
+}
+
+.range-picker-label {
+    width: 60px;
+    flex-shrink: 0;
+    color: var(--text-secondary);
+}
+
+.range-picker-select {
+    flex: 1;
+    min-width: 0;
+}
+
+.range-picker-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 6px;
+}
+
+.range-picker-empty {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* Banners */
+.banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 16px;
+    font-size: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.banner-error {
+    background: var(--comment-bg);
+    color: var(--text);
+    border-bottom-color: var(--danger);
+}
+
+.banner-dismiss {
+    border: none;
+    background: none;
+    color: inherit;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+}
+
 /* Buttons */
 .btn {
     display: inline-flex;
