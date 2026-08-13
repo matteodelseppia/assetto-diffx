@@ -1,0 +1,28 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "typescript", "unicorn", "oxc"],
+  "env": {
+    "browser": true,
+    "node": true,
+    "es2024": true
+  },
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "rules": {
+    // The project uses the automatic JSX runtime (tsconfig "jsx": "react-jsx"),
+    // so React does not need to be in scope.
+    "react/react-in-jsx-scope": "off",
+    // `__dirname` is the standard name for the ESM equivalent.
+    "eslint/no-underscore-dangle": "off",
+    // Stylistic: the codebase keeps helpers next to their only caller.
+    "unicorn/consistent-function-scoping": "off",
+    // The codebase sorts copies (`[...xs].sort(...)`), which does not mutate.
+    "unicorn/no-array-sort": "off",
+    // Diff rows are keyed by path plus index on purpose; see DiffViewer.
+    "react/no-array-index-key": "off"
+  },
+  "ignorePatterns": ["dist", "node_modules"]
+}

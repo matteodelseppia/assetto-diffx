@@ -3,7 +3,6 @@ import {
   ChevronRight,
   Folder,
   FolderOpen,
-  File,
   FilePlus,
   FileMinus,
   FileDiff,

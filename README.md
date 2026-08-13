@@ -87,6 +87,27 @@ The review workflow uses two commands:
 1. **`/assetto-diffx-start-review`** — Launches the assetto-diffx server and opens the browser. Review your changes and leave inline comments.
 2. **`/assetto-diffx-finish-review`** — The agent fetches all comments from the running assetto-diffx server via API, applies the requested changes, and marks each comment as resolved. The browser UI updates in real time as comments are resolved.
 
+## Development
+
+```bash
+pnpm install
+pnpm run check   # lint, typecheck, build, unit tests, system tests
+```
+
+Individual checks:
+
+| Command | What it does |
+| --- | --- |
+| `pnpm run lint` | Static analysis with [oxlint](https://oxc.rs/docs/guide/usage/linter) |
+| `pnpm run typecheck` | `tsc --noEmit` over the sources and the tests |
+| `pnpm run test:unit` | Unit tests for the pure modules (`test/unit`) |
+| `pnpm run test:system` | End-to-end tests that run the built CLI against a throwaway git repository (`test/system`) |
+
+The system tests exercise the real binary, so run `pnpm run build` first.
+
+Every pull request runs the same checks in GitHub Actions
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+
 ## License
 
 MIT
