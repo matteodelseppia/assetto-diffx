@@ -1,14 +1,12 @@
-import { useState, memo } from 'react'
+import { memo } from 'react'
 import { FileDiff } from '@pierre/diffs/react'
-import type { DiffLineAnnotation, FileDiffMetadata, AnnotationSide } from '@pierre/diffs'
+import type { DiffLineAnnotation, FileDiffMetadata, AnnotationSide, SelectedLineRange } from '@pierre/diffs'
 import type { ReviewComment } from '../../types'
+import type { NewComment } from '../hooks/useComments'
+import type { CommentTarget } from '../utils'
+import { commentTargetFromRange } from '../utils'
 import { CommentForm } from './CommentForm'
 import { CommentBubble } from './CommentBubble'
-
-interface PendingComment {
-  side: AnnotationSide
-  lineNumber: number
-}
 
 interface FileDiffCardProps {
   id?: string
@@ -19,8 +17,15 @@ interface FileDiffCardProps {
   tabSize: number
   softWrap: boolean
   viewed: boolean
+  /** The lines being dragged over, when this is the file being selected in. */
+  selection: SelectedLineRange | null
+  /** The lines the open comment form covers, when it belongs to this file. */
+  target: CommentTarget | null
   onViewedChange: (filePath: string, viewed: boolean) => void
-  onAddComment: (filePath: string, side: AnnotationSide, lineNumber: number, lineContent: string, body: string) => void
+  onSelectionStart: (filePath: string) => void
+  onSelectionChange: (filePath: string, selection: SelectedLineRange | null) => void
+  onTargetChange: (filePath: string, target: CommentTarget | null) => void
+  onAddComment: (comment: NewComment) => void
   onDeleteComment: (id: string) => void
 }
 
@@ -33,11 +38,19 @@ export const FileDiffCard = memo(function FileDiffCard({
   tabSize,
   softWrap,
   viewed,
+  selection,
+  target,
   onViewedChange,
+  onSelectionStart,
+  onSelectionChange,
+  onTargetChange,
   onAddComment,
   onDeleteComment,
 }: FileDiffCardProps) {
-  const [pending, setPending] = useState<PendingComment | null>(null)
+  // Once a range has been handed to the comment form, the form owns it and the
+  // diff carries no selection: a leftover one would make the next gutter drag
+  // extend the old range instead of starting where the reviewer pressed.
+  const selectedLines = target ? null : selection
 
   const getLineContent = (side: AnnotationSide, lineNumber: number): string => {
     const lines = side === 'additions' ? fileDiff.additionLines : fileDiff.deletionLines
@@ -60,13 +73,23 @@ export const FileDiffCard = memo(function FileDiffCard({
     return ''
   }
 
+  const getRangeContents = ({ side, startLine, endLine }: CommentTarget): string[] => {
+    const contents: string[] = []
+    for (let line = startLine; line <= endLine; line++) {
+      // Diff lines carry their line ending; a comment quotes the code alone.
+      contents.push(getLineContent(side, line).replace(/\r?\n$/, ''))
+    }
+    return contents
+  }
+
   const allAnnotations: DiffLineAnnotation<ReviewComment | { _pending: true }>[] = [
     ...annotations,
-    ...(pending
+    ...(target
       ? [
           {
-            side: pending.side,
-            lineNumber: pending.lineNumber,
+            side: target.side,
+            // A range comment hangs below its last line, as on GitHub.
+            lineNumber: target.endLine,
             metadata: { _pending: true as const },
           },
         ]
@@ -95,13 +118,31 @@ export const FileDiffCard = memo(function FileDiffCard({
               diffStyle,
               stickyHeader: true,
               expansionLineCount: 20,
+              // The gutter's own "+" reports the range it was dragged over,
+              // and dragging the line numbers selects that range up front. The
+              // two cannot be combined with a custom gutter button, so the
+              // built-in one is styled through unsafeCSS below.
               enableGutterUtility: true,
+              enableLineSelection: true,
+              onLineSelectionChange: (range) => onSelectionChange(filePath, range),
+              onLineSelected: (range) => onSelectionChange(filePath, range),
+              // Selecting elsewhere abandons a comment that was never sent.
+              onLineSelectionStart: () => onSelectionStart(filePath),
+              onGutterUtilityClick: (range) => onTargetChange(filePath, commentTargetFromRange(range)),
               theme: { dark: 'github-dark', light: 'github-light' },
               themeType: 'system',
               overflow: softWrap ? 'wrap' : 'scroll',
-              unsafeCSS: `:host { --diffs-tab-size: ${tabSize}; }`,
+              unsafeCSS: `
+                :host { --diffs-tab-size: ${tabSize}; }
+                [data-utility-button] {
+                  background-color: var(--primary);
+                  border-radius: 50%;
+                }
+                [data-utility-button]:active { cursor: ns-resize; }
+              `,
             }}
             lineAnnotations={allAnnotations}
+            selectedLines={selectedLines}
             renderHeaderMetadata={() => (
               <label className="viewed-label" onClick={(e) => e.stopPropagation()}>
                 <input
@@ -114,14 +155,23 @@ export const FileDiffCard = memo(function FileDiffCard({
             )}
             renderAnnotation={(annotation) => {
               if ('_pending' in annotation.metadata) {
+                const { side, startLine, endLine } = target!
                 return (
                   <CommentForm
+                    startLine={startLine}
+                    endLine={endLine}
                     onSubmit={(body) => {
-                      const lineContent = getLineContent(pending!.side, pending!.lineNumber)
-                      onAddComment(filePath, pending!.side, pending!.lineNumber, lineContent, body)
-                      setPending(null)
+                      onAddComment({
+                        filePath,
+                        side,
+                        startLineNumber: startLine,
+                        lineNumber: endLine,
+                        lineContents: getRangeContents(target!),
+                        body,
+                      })
+                      onTargetChange(filePath, null)
                     }}
-                    onCancel={() => setPending(null)}
+                    onCancel={() => onTargetChange(filePath, null)}
                   />
                 )
               }
@@ -132,19 +182,6 @@ export const FileDiffCard = memo(function FileDiffCard({
                 />
               )
             }}
-            renderGutterUtility={(getHoveredLine) => (
-              <button
-                className="gutter-add-btn"
-                onClick={() => {
-                  const line = getHoveredLine()
-                  if (line) {
-                    setPending({ side: line.side, lineNumber: line.lineNumber })
-                  }
-                }}
-              >
-                +
-              </button>
-            )}
           />
         </>
       )}

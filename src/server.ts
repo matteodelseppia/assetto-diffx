@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { join, extname, resolve } from 'node:path'
 import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
-import { getGitDiff, getCustomGitDiff, getRangeDiff, getRecentCommits, isKnownCommit, isLinePresentInWorktree, getRepoName, getBranchName, getFileContent, getBlobContent, getWorktreeFileContent, getTabSizeForFiles, getUntrackedFilePaths } from './git.js'
+import { getGitDiff, getCustomGitDiff, getRangeDiff, getRecentCommits, isKnownCommit, areLinesPresentInWorktree, getRepoName, getBranchName, getFileContent, getBlobContent, getWorktreeFileContent, getTabSizeForFiles, getUntrackedFilePaths } from './git.js'
 import { loadSettings, saveSettings } from './settings.js'
 import { InMemoryCommentStore } from './comments.js'
 import type { CommentStore } from './comments.js'
@@ -251,13 +251,23 @@ export function createApp(clientDir: string, customDiffArgs?: string[], commentS
 
   app.post('/api/comments', async (c) => {
     const body = await c.req.json()
+    const lineContents: string[] = Array.isArray(body.lineContents) ? body.lineContents : []
+    // A range selected upwards arrives with its ends reversed; the comment is
+    // anchored to the last line either way.
+    const startLineNumber = Math.min(body.startLineNumber ?? body.lineNumber, body.lineNumber)
+    const lineNumber = Math.max(body.startLineNumber ?? body.lineNumber, body.lineNumber)
     // Comments are handed to a coding agent that works on the working tree, so
     // an added line the reviewer found in an older commit but that no longer
     // exists is not actionable. Deleted lines are exempt: they are absent by
     // definition.
-    if (body.side === 'additions' && !isLinePresentInWorktree(body.filePath, body.lineContent ?? '')) {
+    if (body.side === 'additions' && !areLinesPresentInWorktree(body.filePath, lineContents)) {
       return c.json(
-        { error: 'This line is no longer part of the latest version of the file, so it cannot be commented on.' },
+        {
+          error:
+            lineContents.length > 1
+              ? 'Some of these lines are no longer part of the latest version of the file, so they cannot be commented on.'
+              : 'This line is no longer part of the latest version of the file, so it cannot be commented on.',
+        },
         409,
       )
     }
@@ -265,8 +275,9 @@ export function createApp(clientDir: string, customDiffArgs?: string[], commentS
       id: crypto.randomUUID(),
       filePath: body.filePath,
       side: body.side,
-      lineNumber: body.lineNumber,
-      lineContent: body.lineContent,
+      startLineNumber,
+      lineNumber,
+      lineContents,
       body: body.body,
       status: 'open' as const,
       createdAt: Date.now(),

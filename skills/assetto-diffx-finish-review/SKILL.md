@@ -28,8 +28,9 @@ The response is a JSON array of comment objects:
     "id": "uuid",
     "filePath": "src/utils/parser.ts",
     "side": "additions",
+    "startLineNumber": 42,
     "lineNumber": 42,
-    "lineContent": "const x = tokenize(input)",
+    "lineContents": ["const x = tokenize(input)"],
     "body": "Rename x to parsedToken for clarity",
     "status": "open",
     "createdAt": 1234567890,
@@ -45,7 +46,7 @@ For each comment with `"status": "open"`, first determine the intent — is it a
 #### Change requests (e.g., "Rename x to parsedToken", "Extract this into a helper")
 
 1. Read the file at `filePath`
-2. Find the relevant code using `lineContent` as context
+2. Find the relevant code using `lineContents` as context
 3. Apply the change described in `body`
 4. Reply to the comment explaining what you did, then mark it as resolved:
 
@@ -72,6 +73,8 @@ curl -s -X POST http://localhost:<port>/api/comments/<id>/replies \
 ```
 
 The `side` field tells you whether the comment is on an added line (`additions`) or a deleted line (`deletions`).
+
+A comment can cover a range of lines: `startLineNumber` is its first line and `lineNumber` its last, and `lineContents` holds the content of every line in between. They are equal for a single-line comment.
 
 ### 3. Handle edge cases
 
