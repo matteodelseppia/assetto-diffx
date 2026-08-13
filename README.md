@@ -1,13 +1,13 @@
-# diffx
+# assetto-diffx
 
 A local code review tool designed for the coding agent workflow. Review AI-generated changes in a GitHub PR-like web UI, leave inline comments, then hand them back to your coding agent to fix.
 
-![screenshot](https://raw.githubusercontent.com/wong2/diffx/main/screenshot.png)
+![screenshot](https://raw.githubusercontent.com/matteodelseppia/assetto-diffx/main/screenshot.png)
 
 ## Install
 
 ```bash
-npm install -g diffx-cli
+npm install -g assetto-diffx
 ```
 
 ## Usage
@@ -15,7 +15,7 @@ npm install -g diffx-cli
 Run in any git repository:
 
 ```bash
-diffx
+assetto-diffx
 ```
 
 This starts a local server and opens your browser with a diff review UI.
@@ -23,18 +23,18 @@ This starts a local server and opens your browser with a diff review UI.
 ### Options
 
 ```
-diffx [options] [-- <git-diff-args>]
+assetto-diffx [options] [-- <git-diff-args>]
 
 Options:
   -p, --port <port>   Server port (default: 3433)
   --no-open           Don't auto-open browser
 
 Examples:
-  diffx                          # Review working tree changes
-  diffx -p 8080                  # Use custom port
-  diffx -- HEAD~3                # Diff against 3 commits ago
-  diffx -- main..HEAD            # Diff between branches
-  diffx -- --cached -- src/      # Staged changes in src/
+  assetto-diffx                          # Review working tree changes
+  assetto-diffx -p 8080                  # Use custom port
+  assetto-diffx -- HEAD~3                # Diff against 3 commits ago
+  assetto-diffx -- main..HEAD            # Diff between branches
+  assetto-diffx -- --cached -- src/      # Staged changes in src/
 ```
 
 ## Features
@@ -76,16 +76,16 @@ Each comment includes the commented code line with a `+`/`-` prefix indicating w
 
 ## Agent Skills
 
-Install the diffx skills to use diffx directly from your AI coding agent:
+Install the assetto-diffx skills to use assetto-diffx directly from your AI coding agent:
 
 ```bash
-npx skills add wong2/diffx
+npx skills add matteodelseppia/assetto-diffx
 ```
 
 The review workflow uses two commands:
 
-1. **`/diffx-start-review`** — Launches the diffx server and opens the browser. Review your changes and leave inline comments.
-2. **`/diffx-finish-review`** — The agent fetches all comments from the running diffx server via API, applies the requested changes, and marks each comment as resolved. The browser UI updates in real time as comments are resolved.
+1. **`/assetto-diffx-start-review`** — Launches the assetto-diffx server and opens the browser. Review your changes and leave inline comments.
+2. **`/assetto-diffx-finish-review`** — The agent fetches all comments from the running assetto-diffx server via API, applies the requested changes, and marks each comment as resolved. The browser UI updates in real time as comments are resolved.
 
 ## License
 

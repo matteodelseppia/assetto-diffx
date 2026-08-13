@@ -20,9 +20,9 @@ const { values, positionals } = parseArgs({
 })
 
 if (values.help) {
-  console.log(`diffx - Local code review tool for git diffs
+  console.log(`assetto-diffx - Local code review tool for git diffs
 
-Usage: diffx [options] [-- <git diff args>]
+Usage: assetto-diffx [options] [-- <git diff args>]
 
 Options:
   -p, --port <port>  Port to run the server on (default: random available port)
@@ -33,11 +33,11 @@ Options:
   -h, --help         Show this help message
 
 Examples:
-  diffx                        Review uncommitted changes
-  diffx -- --staged            Review staged changes
-  diffx -- HEAD~3              Review last 3 commits
-  diffx -- main..feature       Compare branches
-  diffx --host 0.0.0.0         Allow other machines on the LAN to review`)
+  assetto-diffx                        Review uncommitted changes
+  assetto-diffx -- --staged            Review staged changes
+  assetto-diffx -- HEAD~3              Review last 3 commits
+  assetto-diffx -- main..feature       Compare branches
+  assetto-diffx --host 0.0.0.0         Allow other machines on the LAN to review`)
   process.exit(0)
 }
 
@@ -70,7 +70,7 @@ const { port: actualPort } = await startServer({ port, host, clientDir: resolved
 
 const localUrl = `http://${host}:${actualPort}`
 
-console.log(`diffx server running at ${localUrl}`)
+console.log(`assetto-diffx server running at ${localUrl}`)
 
 if (!values['no-open']) {
   const settings = loadSettings()
