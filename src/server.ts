@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { join, extname, resolve } from 'node:path'
 import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
-import { getGitDiff, getCustomGitDiff, getRepoName, getBranchName, getFileContent, getBlobContent, getWorktreeFileContent, isImageFile, getTabSizeForFiles, getUntrackedFilePaths } from './git.js'
+import { getGitDiff, getCustomGitDiff, getRepoName, getBranchName, getFileContent, getBlobContent, getWorktreeFileContent, getTabSizeForFiles, getUntrackedFilePaths } from './git.js'
 import { loadSettings, saveSettings } from './settings.js'
 import { InMemoryCommentStore } from './comments.js'
 import type { CommentStore } from './comments.js'
@@ -29,7 +29,7 @@ export interface BinaryFileInfo {
   type: 'added' | 'deleted' | 'changed' | 'untracked'
 }
 
-function parseFilePaths(patch: string): string[] {
+export function parseFilePaths(patch: string): string[] {
   const paths = new Set<string>()
   for (const line of patch.split('\n')) {
     const match = line.match(/^diff --git a\/.+ b\/(.+)$/)
@@ -38,7 +38,7 @@ function parseFilePaths(patch: string): string[] {
   return [...paths]
 }
 
-function parseBinaryFiles(patch: string, untrackedFiles?: Set<string>): BinaryFileInfo[] {
+export function parseBinaryFiles(patch: string, untrackedFiles?: Set<string>): BinaryFileInfo[] {
   const binaryFiles: BinaryFileInfo[] = []
   const lines = patch.split('\n')
   for (let i = 0; i < lines.length; i++) {
@@ -78,7 +78,7 @@ function parseBinaryFiles(patch: string, untrackedFiles?: Set<string>): BinaryFi
   return binaryFiles
 }
 
-function diffContainsFileVersion(patch: string, path: string, oldOid: string, newOid: string): boolean {
+export function diffContainsFileVersion(patch: string, path: string, oldOid: string, newOid: string): boolean {
   for (const chunk of patch.split(/^(?=diff --git )/m)) {
     // Match the new-file path from the `+++ b/<path>` header (as the client
     // does); the `diff --git` line is ambiguous for paths containing ` b/`.
@@ -276,13 +276,13 @@ export function startServer(options: {
 }): Promise<{ port: number }> {
   const app = createApp(options.clientDir, options.customDiffArgs)
 
-  return new Promise((resolve) => {
-    const server = serve({
+  return new Promise((resolveStarted) => {
+    serve({
       fetch: app.fetch,
       port: options.port,
       hostname: options.host,
     }, (info) => {
-      resolve({ port: info.port })
+      resolveStarted({ port: info.port })
     })
   })
 }

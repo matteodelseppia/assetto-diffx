@@ -28,11 +28,22 @@
   "scripts": {
     "build": "vite build && tsdown",
     "changeset": "changeset",
+    "check": "pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test",
     "dev:client": "vite",
     "dev:server": "tsx src/cli.ts --no-open -p 3433",
+    "lint": "oxlint",
     "prepublishOnly": "pnpm run build",
     "release": "pnpm run build && changeset publish",
+    "test": "pnpm run test:unit && pnpm run test:system",
+    "test:system": "vitest run test/system",
+    "test:unit": "vitest run test/unit",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "version-packages": "changeset version"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "dependencies": {
     "@hono/node-server": "^1.14.1",
@@ -52,11 +63,13 @@
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^6.0.1",
     "lucide-react": "^1.7.0",
+    "oxlint": "^1.78.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "tsdown": "^0.21.7",
     "tsx": "^4.19.4",
     "typescript": "^6.0.2",
-    "vite": "^8.0.3"
+    "vite": "^8.0.3",
+    "vitest": "^4.1.10"
   }
 }

@@ -16,7 +16,7 @@ import { CommentTracker } from './components/CommentTracker'
 import { SidebarStorage } from './sidebarStorage'
 
 function useWindowSize({ factor }: { factor: number }) {
-  const compute = () => Math.round(window.innerWidth * factor)
+  const compute = useCallback(() => Math.round(window.innerWidth * factor), [factor])
 
   const [size, setSize] = useState(compute)
 
@@ -24,7 +24,7 @@ function useWindowSize({ factor }: { factor: number }) {
     const handleResize = () => setSize(compute())
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [factor])
+  }, [compute])
 
   return size
 }
