@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { basename, join, resolve } from 'node:path'
 import { readFileSync, lstatSync, readlinkSync } from 'node:fs'
 import { isSafePath } from './path.js'
+import type { CommitSummary } from './types.js'
 import { parseSync as parseEditorConfig, type ProcessedFileConfig } from 'editorconfig'
 
 const IMAGE_EXTENSIONS = new Set([
@@ -116,6 +117,69 @@ const DIFF_FLAGS = ['--no-ext-diff', '--no-color'] as const
 
 export function getCustomGitDiff(args: string[]): string {
   return execFileSync('git', ['diff', ...DIFF_FLAGS, ...args], { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 })
+}
+
+const COMMIT_SHA_REGEX = /^[0-9a-f]{7,40}$/
+
+/** Accepts only full or abbreviated object ids that resolve to a commit. */
+export function isKnownCommit(sha: string): boolean {
+  if (!COMMIT_SHA_REGEX.test(sha)) return false
+  try {
+    execFileSync('git', ['rev-parse', '--verify', '--quiet', `${sha}^{commit}`], { stdio: 'pipe' })
+    return true
+  } catch {
+    return false
+  }
+}
+
+// ASCII unit separator — cannot appear in a commit subject or author name.
+const COMMIT_FIELD_SEPARATOR = '\x1f'
+
+export function getRecentCommits(limit: number): CommitSummary[] {
+  const format = ['%H', '%h', '%s', '%an', '%aI'].join(COMMIT_FIELD_SEPARATOR)
+  let output: string
+  try {
+    output = execFileSync('git', ['log', `--max-count=${limit}`, `--format=${format}`], {
+      encoding: 'utf-8',
+      stdio: 'pipe',
+      maxBuffer: 50 * 1024 * 1024,
+    }).trim()
+  } catch {
+    // A repository without any commit yet has no HEAD to log.
+    return []
+  }
+  if (!output) return []
+  return output.split('\n').map((line) => {
+    const [sha, shortSha, subject, author, date] = line.split(COMMIT_FIELD_SEPARATOR)
+    return { sha, shortSha, subject, author, date }
+  })
+}
+
+/**
+ * Diff between two selected commits, or between a commit and the working tree
+ * when `head` is omitted. Both ends must have been validated with
+ * {@link isKnownCommit} first — they are passed to git as revision arguments.
+ */
+export function getRangeDiff(base: string, head?: string): string {
+  const revisions = head ? [base, head] : [base]
+  return execFileSync('git', ['diff', ...DIFF_FLAGS, ...revisions], {
+    encoding: 'utf-8',
+    maxBuffer: 50 * 1024 * 1024,
+  })
+}
+
+/**
+ * Whether `lineContent` still exists in the working-tree version of the file.
+ * Comments are handed to a coding agent that edits the working tree, so a
+ * comment on code that only exists in an older commit is not actionable.
+ * Blank lines carry no content to match, so only the file has to exist.
+ */
+export function isLinePresentInWorktree(filePath: string, lineContent: string): boolean {
+  const content = getWorktreeFileContent(filePath)
+  if (content == null) return false
+  const needle = lineContent.trim()
+  if (!needle) return true
+  return content.split('\n').some((line) => line.trim() === needle)
 }
 
 export function getGitDiff(options: { staged?: boolean; untracked?: boolean } = {}): string {

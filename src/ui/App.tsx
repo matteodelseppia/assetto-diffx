@@ -5,6 +5,7 @@ import { Virtualizer } from '@pierre/diffs/react'
 import type { FileDiffMetadata } from '@pierre/diffs'
 import type { ReviewComment } from '../types'
 import { useDiff } from './hooks/useDiff'
+import { useCommits, DEFAULT_RANGE, type CommitRange } from './hooks/useCommits'
 import { useComments } from './hooks/useComments'
 import { useSettings } from './hooks/useSettings'
 import { useViewed } from './hooks/useViewed'
@@ -31,11 +32,13 @@ function useWindowSize({ factor }: { factor: number }) {
 
 export function App() {
   const { settings, loaded, updateSettings } = useSettings()
-  const { patch, repoName, branch, customMode, binaryFiles, tabSizeMap, untrackedFiles, loading, error } = useDiff({
-    staged: settings.staged,
-    untracked: settings.untracked,
-  })
-  const { comments, addComment, removeComment, copyAllComments } =
+  const [range, setRange] = useState<CommitRange>(DEFAULT_RANGE)
+  const { commits } = useCommits()
+  const { patch, repoName, branch, customMode, rangeMode, binaryFiles, tabSizeMap, untrackedFiles, loading, error } = useDiff(
+    { staged: settings.staged, untracked: settings.untracked },
+    range,
+  )
+  const { comments, addComment, removeComment, copyAllComments, addError, dismissAddError } =
     useComments()
   const [activeFile, setActiveFile] = useState<string | null>(null)
   const [sidebar, setSidebar] = useState(() => SidebarStorage.load())
@@ -84,7 +87,7 @@ export function App() {
     }
   }, [patch, binaryFiles])
 
-  const fullFiles = useFullDiffs(patch, files, { staged: settings.staged, untracked: settings.untracked })
+  const fullFiles = useFullDiffs(patch, files, { staged: settings.staged, untracked: settings.untracked }, range)
   const displayFiles = useMemo(() => {
     if (fullFiles.size === 0) return files
     return files.map((f) => fullFiles.get(fileKey(f)) ?? f)
@@ -164,7 +167,7 @@ export function App() {
     </div>
   )
 
-  if (!loaded || loading) {
+  if (!loaded || (loading && patch === null)) {
     return (
       <div className="loading">
         <p>Loading diff...</p>
@@ -195,6 +198,10 @@ export function App() {
         softWrap={settings.softWrap}
         browser={settings.browser}
         customMode={customMode}
+        rangeMode={rangeMode}
+        commits={commits}
+        range={range}
+        onRangeChange={setRange}
         onDiffStyleChange={(style) => updateSettings({ diffStyle: style })}
         onDiffOptionsChange={(options) => updateSettings(options)}
         onDefaultTabSizeChange={(size) => updateSettings({ defaultTabSize: size })}
@@ -202,6 +209,14 @@ export function App() {
         onBrowserChange={(browser) => updateSettings({ browser })}
         onCopyComments={copyAllComments}
       />
+      {addError && (
+        <div className="banner banner-error" role="alert">
+          <span>{addError}</span>
+          <button className="banner-dismiss" onClick={dismissAddError} aria-label="Dismiss">
+            ×
+          </button>
+        </div>
+      )}
       <div className="app-body">
         {sidebar.collapsed ? (
           <aside className="sidebar sidebar-collapsed" style={{ width: sidebar.visibleSize() }}>

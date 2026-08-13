@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { processFile } from '@pierre/diffs'
 import type { FileDiffMetadata } from '@pierre/diffs'
+import { rangeParams, type CommitRange } from './useCommits'
 
 const ZERO_OID = /^0+$/
 
@@ -59,10 +60,16 @@ function contentsMatchHunks(partial: FileDiffMetadata, full: FileDiffMetadata): 
  * complete old/new file contents, which enables hunk context expansion.
  * Returns a map from `fileKey(file)` to the upgraded metadata.
  */
-export function useFullDiffs(patch: string | null, files: FileDiffMetadata[], options: { staged: boolean; untracked: boolean }) {
+export function useFullDiffs(
+  patch: string | null,
+  files: FileDiffMetadata[],
+  options: { staged: boolean; untracked: boolean },
+  range: CommitRange,
+) {
   const [fullFiles, setFullFiles] = useState<Map<string, FileDiffMetadata>>(() => new Map())
   const requested = useRef(new Set<string>())
   const patchRef = useRef(patch)
+  const { base, head } = range
 
   useEffect(() => {
     if (patchRef.current !== patch) {
@@ -90,6 +97,7 @@ export function useFullDiffs(patch: string | null, files: FileDiffMetadata[], op
         newOid: file.newObjectId ?? '',
         staged: String(options.staged),
         untracked: String(options.untracked),
+        ...rangeParams({ base, head }),
       })
       fetch(`/api/file-versions?${params}`)
         .then((res) => (res.ok ? res.json() : null))
@@ -105,7 +113,7 @@ export function useFullDiffs(patch: string | null, files: FileDiffMetadata[], op
         })
         .catch(() => {})
     }
-  }, [patch, files, options.staged, options.untracked])
+  }, [patch, files, options.staged, options.untracked, base, head])
 
   return fullFiles
 }

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { join, extname, resolve } from 'node:path'
 import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
-import { getGitDiff, getCustomGitDiff, getRepoName, getBranchName, getFileContent, getBlobContent, getWorktreeFileContent, getTabSizeForFiles, getUntrackedFilePaths } from './git.js'
+import { getGitDiff, getCustomGitDiff, getRangeDiff, getRecentCommits, isKnownCommit, isLinePresentInWorktree, getRepoName, getBranchName, getFileContent, getBlobContent, getWorktreeFileContent, getTabSizeForFiles, getUntrackedFilePaths } from './git.js'
 import { loadSettings, saveSettings } from './settings.js'
 import { InMemoryCommentStore } from './comments.js'
 import type { CommentStore } from './comments.js'
@@ -90,29 +90,78 @@ export function diffContainsFileVersion(patch: string, path: string, oldOid: str
   return false
 }
 
+/** Number of commits offered in the browser's range picker. */
+export const COMMIT_LIST_LIMIT = 100
+
+export interface CommitRange {
+  base: string
+  /** Omitted when the range ends at the working tree. */
+  head?: string
+}
+
+/**
+ * Reads the `base`/`head` query parameters into a commit range. Returns `null`
+ * when no range was requested and `'invalid'` when an end does not resolve to a
+ * commit in this repository — the picker only ever sends ids it was served,
+ * so anything else is a stale page or a hand-written request.
+ */
+export function parseRangeQuery(
+  base: string | undefined,
+  head: string | undefined,
+  isCommit: (sha: string) => boolean = isKnownCommit,
+): CommitRange | null | 'invalid' {
+  if (!base) return head ? 'invalid' : null
+  if (!isCommit(base)) return 'invalid'
+  if (!head) return { base }
+  if (!isCommit(head)) return 'invalid'
+  return { base, head }
+}
+
 export function createApp(clientDir: string, customDiffArgs?: string[], commentStore?: CommentStore) {
   const app = new Hono()
   const isCustomMode = !!customDiffArgs
   const store = commentStore ?? new InMemoryCommentStore()
   const viewedFiles = new Map<string, string>()
 
+  // An explicit range picked in the browser wins over both the CLI's custom
+  // diff arguments and the working-tree default.
+  const buildPatch = (range: CommitRange | null, staged: boolean, untracked: boolean): string => {
+    if (range) return getRangeDiff(range.base, range.head)
+    if (isCustomMode) return getCustomGitDiff(customDiffArgs)
+    return getGitDiff({ staged, untracked })
+  }
+
+  app.get('/api/commits', (c) => {
+    return c.json({ commits: getRecentCommits(COMMIT_LIST_LIMIT) })
+  })
+
   app.get('/api/diff', (c) => {
-    let patch: string
     const staged = c.req.query('staged') === 'true'
     const untracked = c.req.query('untracked') === 'true'
-    if (isCustomMode) {
-      patch = getCustomGitDiff(customDiffArgs)
-    } else {
-      patch = getGitDiff({ staged, untracked })
+    const range = parseRangeQuery(c.req.query('base'), c.req.query('head'))
+    if (range === 'invalid') {
+      return c.json({ error: 'Unknown commit in requested range' }, 400)
     }
+    const patch = buildPatch(range, staged, untracked)
     const repoName = getRepoName()
     const branch = getBranchName()
-    const untrackedFiles = untracked ? getUntrackedFilePaths() : []
+    // Untracked files are not part of any commit, so they never belong to a
+    // commit range.
+    const untrackedFiles = untracked && !range ? getUntrackedFilePaths() : []
     const untrackedSet = new Set(untrackedFiles)
     const binaryFiles = parseBinaryFiles(patch, untrackedSet)
     const filePaths = parseFilePaths(patch)
     const tabSizeMap = getTabSizeForFiles(filePaths)
-    return c.json({ patch, repoName, branch, customMode: isCustomMode, binaryFiles, tabSizeMap, untrackedFiles })
+    return c.json({
+      patch,
+      repoName,
+      branch,
+      customMode: isCustomMode,
+      rangeMode: !!range,
+      binaryFiles,
+      tabSizeMap,
+      untrackedFiles,
+    })
   })
 
   app.get('/api/file-content', (c) => {
@@ -148,7 +197,11 @@ export function createApp(clientDir: string, customDiffArgs?: string[], commentS
     }
     const staged = c.req.query('staged') === 'true'
     const untracked = c.req.query('untracked') === 'true'
-    const patch = isCustomMode ? getCustomGitDiff(customDiffArgs) : getGitDiff({ staged, untracked })
+    const range = parseRangeQuery(c.req.query('base'), c.req.query('head'))
+    if (range === 'invalid') {
+      return c.json({ error: 'Unknown commit in requested range' }, 400)
+    }
+    const patch = buildPatch(range, staged, untracked)
     if (!diffContainsFileVersion(patch, path, oldOid, newOid)) {
       return c.json({ error: 'File version not in current diff' }, 404)
     }
@@ -198,6 +251,16 @@ export function createApp(clientDir: string, customDiffArgs?: string[], commentS
 
   app.post('/api/comments', async (c) => {
     const body = await c.req.json()
+    // Comments are handed to a coding agent that works on the working tree, so
+    // an added line the reviewer found in an older commit but that no longer
+    // exists is not actionable. Deleted lines are exempt: they are absent by
+    // definition.
+    if (body.side === 'additions' && !isLinePresentInWorktree(body.filePath, body.lineContent ?? '')) {
+      return c.json(
+        { error: 'This line is no longer part of the latest version of the file, so it cannot be commented on.' },
+        409,
+      )
+    }
     const comment = {
       id: crypto.randomUUID(),
       filePath: body.filePath,
