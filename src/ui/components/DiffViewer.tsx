@@ -1,7 +1,9 @@
-import { memo, useMemo } from 'react'
-import type { FileDiffMetadata, DiffLineAnnotation, AnnotationSide } from '@pierre/diffs'
+import { memo, useCallback, useMemo, useState } from 'react'
+import type { FileDiffMetadata, DiffLineAnnotation, SelectedLineRange } from '@pierre/diffs'
 import type { ReviewComment } from '../../types'
 import type { BinaryFileInfo } from '../hooks/useDiff'
+import type { NewComment } from '../hooks/useComments'
+import type { CommentTarget } from '../utils'
 import { FileDiffCard } from './FileDiffCard'
 import { BinaryFileDiff } from './BinaryFileDiff'
 
@@ -15,11 +17,22 @@ interface DiffViewerProps {
   binaryFiles: Map<string, BinaryFileInfo>
   onViewedChange: (filePath: string, viewed: boolean) => void
   fileAnnotationsMap: Map<string, DiffLineAnnotation<ReviewComment>[]>
-  onAddComment: (filePath: string, side: AnnotationSide, lineNumber: number, lineContent: string, body: string) => void
+  onAddComment: (comment: NewComment) => void
   onDeleteComment: (id: string) => void
 }
 
 const emptyAnnotations: DiffLineAnnotation<ReviewComment>[] = []
+
+/**
+ * Where the reviewer is composing a comment. Only one file is ever selecting or
+ * holding an unsent comment form, so selecting lines anywhere abandons the form
+ * that was open elsewhere rather than leaving a second one behind.
+ */
+interface ActiveComment {
+  filePath: string
+  selection: SelectedLineRange | null
+  target: CommentTarget | null
+}
 
 export const DiffViewer = memo(function DiffViewer({
   files,
@@ -34,6 +47,24 @@ export const DiffViewer = memo(function DiffViewer({
   onAddComment,
   onDeleteComment,
 }: DiffViewerProps) {
+  const [active, setActive] = useState<ActiveComment | null>(null)
+
+  const handleSelectionStart = useCallback((filePath: string) => {
+    setActive({ filePath, selection: null, target: null })
+  }, [])
+
+  const handleSelectionChange = useCallback((filePath: string, selection: SelectedLineRange | null) => {
+    setActive((prev) => ({
+      filePath,
+      selection,
+      target: prev?.filePath === filePath ? prev.target : null,
+    }))
+  }, [])
+
+  const handleTargetChange = useCallback((filePath: string, target: CommentTarget | null) => {
+    setActive(target ? { filePath, selection: null, target } : null)
+  }, [])
+
   const sortedFiles = useMemo(() => {
     return [...files].sort((a, b) => {
       const partsA = a.name.split('/')
@@ -90,7 +121,12 @@ export const DiffViewer = memo(function DiffViewer({
             tabSize={tabSizeMap[filePath] ?? defaultTabSize}
             softWrap={softWrap}
             viewed={viewedFiles.has(filePath)}
+            selection={active?.filePath === filePath ? active.selection : null}
+            target={active?.filePath === filePath ? active.target : null}
             onViewedChange={onViewedChange}
+            onSelectionStart={handleSelectionStart}
+            onSelectionChange={handleSelectionChange}
+            onTargetChange={handleTargetChange}
             onAddComment={onAddComment}
             onDeleteComment={onDeleteComment}
           />

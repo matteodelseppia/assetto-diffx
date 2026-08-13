@@ -5,13 +5,28 @@ import {
   Circle,
 } from 'lucide-react'
 import type { ReviewComment } from '../../types'
-import { timeAgo, truncate, fileName } from '../utils'
+import { timeAgo, truncate, fileName, lineRange } from '../utils'
 
 interface CommentTrackerProps {
   comments: ReviewComment[]
 }
 
 type CommentStatus = 'open' | 'replied' | 'resolved'
+
+/**
+ * Brings a comment into view. The plain `#comment-…` jump aligns it with the
+ * top of the scroller, where the file's sticky header covers it, and does
+ * nothing at all when the line it hangs from sits in a hunk that has not been
+ * expanded — in that case the file itself is the closest we can get.
+ */
+function scrollToComment(comment: ReviewComment): void {
+  const bubble = document.getElementById(`comment-${comment.id}`)
+  if (bubble) {
+    bubble.scrollIntoView({ block: 'center' })
+    return
+  }
+  document.getElementById(`file-${comment.filePath}`)?.scrollIntoView({ block: 'start' })
+}
 
 function getCommentStatus(comment: ReviewComment): CommentStatus {
   if (comment.status === 'resolved') return 'resolved'
@@ -70,11 +85,18 @@ export function CommentTracker({ comments }: CommentTrackerProps) {
               key={comment.id}
               className={`ct-item ${status === 'resolved' ? 'ct-item-resolved' : ''}`}
             >
-              <a href={`#comment-${comment.id}`} className="ct-item-link">
+              <a
+                href={`#comment-${comment.id}`}
+                className="ct-item-link"
+                onClick={(e) => {
+                  e.preventDefault()
+                  scrollToComment(comment)
+                }}
+              >
                 <div className="ct-item-header">
                   <StatusBadge status={status} />
                   <span className="ct-item-file" title={comment.filePath}>
-                    {fileName(comment.filePath)}:{comment.lineNumber}
+                    {fileName(comment.filePath)}:{lineRange(comment)}
                   </span>
                   <span className="ct-item-time">{timeAgo(comment.createdAt)}</span>
                 </div>

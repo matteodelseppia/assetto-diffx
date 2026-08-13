@@ -44,6 +44,7 @@ Examples:
 - **Syntax highlighting** — Powered by Shiki with GitHub themes
 - **File tree** — Hierarchical file browser with search filter and file change-type icons
 - **Inline comments** — Click the `+` button on any line to add a review comment
+- **Multi-line comments** — Drag across the line numbers, or drag the `+` button, to comment on a whole range of lines
 - **Comment replies** — AI agents can reply to comments via API, displayed with bot avatar in the UI
 - **Comment status tracker** — Sidebar widget showing open, replied, and resolved comment counts with click-to-navigate links
 - **Copy comments** — One-click copy all comments as structured XML for AI coding agents
@@ -63,8 +64,16 @@ CLI was started with (the working tree, or the custom `git diff` arguments).
 
 Review comments are meant for a coding agent that edits the working tree, so a
 comment on an added line that no longer exists in the current version of the
-file is refused; the UI explains why. Comments on deleted lines are always
+file is refused; the UI explains why. A comment covering a range is refused
+when any one of its lines is gone. Comments on deleted lines are always
 allowed, since deleted code is absent by definition.
+
+## Commenting on a range of lines
+
+To comment on more than one line, press the line number of the first line and
+drag down (or up) to the last one, then click the `+` button. Dragging the `+`
+button itself does the same thing in one gesture. The comment hangs below the
+last line of the range, and the form shows which lines it covers.
 
 ## Comment Output Format
 
@@ -81,11 +90,17 @@ Rename `x` to `parsedToken` for clarity.
 <code>- if (input != null) {</code>
 This null check removal may cause a bug when `input` is undefined.
 </comment>
+<comment lines="60-62">
+<code>+ const a = 1
++ const b = 2
++ const c = 3</code>
+Collapse these three into a single lookup table.
+</comment>
 </file>
 </code-review-comments>
 ```
 
-Each comment includes the commented code line with a `+`/`-` prefix indicating whether it's an added or removed line.
+Each comment includes the commented code with a `+`/`-` prefix on every line, indicating whether it's added or removed. Comments covering several lines carry a `lines="start-end"` attribute instead of `line`.
 
 ## Agent Skills
 

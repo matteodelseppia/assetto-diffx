@@ -533,33 +533,6 @@ body {
     border-color: var(--success);
 }
 
-/* Gutter add button */
-.gutter-add-btn {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    border: none;
-    background: var(--primary);
-    color: #ffffff;
-    font-size: 12px;
-    font-weight: bold;
-    cursor: pointer;
-    line-height: 1;
-    opacity: 0.7;
-    transition: opacity 0.1s;
-}
-
-.gutter-add-btn:hover {
-    opacity: 1;
-}
-
 /* Comment form */
 .comment-form {
     max-width: 600px;
@@ -568,6 +541,12 @@ body {
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 6px;
+}
+
+.comment-form-target {
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
 }
 
 .comment-form textarea {
@@ -597,6 +576,11 @@ body {
 }
 
 /* Comment bubble */
+.comment-bubble-lines {
+    font-size: 12px;
+    font-weight: 600;
+}
+
 .comment-bubble {
     max-width: 600px;
     padding: 10px 14px;
