@@ -1,10 +1,24 @@
 import { useCallback, useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import type { DiffLineAnnotation } from '@pierre/diffs'
 import type { ReviewComment } from '../../types'
 import { formatComments } from '../utils'
 
-const COMMENTS_KEY = ['comments']
+export const COMMENTS_KEY = ['comments']
+
+/**
+ * Applies a mutation's result to the cached list. The list is also polled every
+ * few seconds, so a poll that is already in flight has to be cancelled first —
+ * otherwise it resolves afterwards and overwrites the change with the snapshot
+ * it took before the mutation, making the comment appear to revert.
+ */
+export async function patchCachedComments(
+  queryClient: QueryClient,
+  update: (prev: ReviewComment[]) => ReviewComment[],
+): Promise<void> {
+  await queryClient.cancelQueries({ queryKey: COMMENTS_KEY })
+  queryClient.setQueryData<ReviewComment[]>(COMMENTS_KEY, (prev = []) => update(prev))
+}
 
 /** A comment as the reviewer wrote it, before the server assigns it an id. */
 export type NewComment = Pick<
@@ -12,8 +26,8 @@ export type NewComment = Pick<
   'filePath' | 'side' | 'startLineNumber' | 'lineNumber' | 'lineContents' | 'body'
 >
 
-async function fetchComments(): Promise<ReviewComment[]> {
-  const res = await fetch('/api/comments')
+async function fetchComments({ signal }: { signal: AbortSignal }): Promise<ReviewComment[]> {
+  const res = await fetch('/api/comments', { signal })
   return res.json()
 }
 
@@ -21,6 +35,11 @@ export function useComments() {
   const queryClient = useQueryClient()
   const [addError, setAddError] = useState<string | null>(null)
   const { data: comments = [] } = useQuery({ queryKey: COMMENTS_KEY, queryFn: fetchComments, refetchInterval: 3000 })
+
+  const patchComments = useCallback(
+    (update: (prev: ReviewComment[]) => ReviewComment[]) => patchCachedComments(queryClient, update),
+    [queryClient],
+  )
 
   const addMutation = useMutation({
     mutationFn: async (params: NewComment) => {
@@ -37,7 +56,7 @@ export function useComments() {
     },
     onSuccess: (comment) => {
       setAddError(null)
-      queryClient.setQueryData<ReviewComment[]>(COMMENTS_KEY, (prev = []) => [...prev, comment])
+      return patchComments((prev) => [...prev, comment])
     },
     onError: (err: Error) => {
       setAddError(err.message)
@@ -49,9 +68,7 @@ export function useComments() {
       await fetch(`/api/comments/${id}`, { method: 'DELETE' })
       return id
     },
-    onSuccess: (id) => {
-      queryClient.setQueryData<ReviewComment[]>(COMMENTS_KEY, (prev = []) => prev.filter((c) => c.id !== id))
-    },
+    onSuccess: (id) => patchComments((prev) => prev.filter((c) => c.id !== id)),
   })
 
   const editMutation = useMutation({
@@ -63,11 +80,7 @@ export function useComments() {
       })
       return res.json() as Promise<ReviewComment>
     },
-    onSuccess: (updated) => {
-      queryClient.setQueryData<ReviewComment[]>(COMMENTS_KEY, (prev = []) =>
-        prev.map((c) => (c.id === updated.id ? updated : c)),
-      )
-    },
+    onSuccess: (updated) => patchComments((prev) => prev.map((c) => (c.id === updated.id ? updated : c))),
   })
 
   const addComment = useCallback(
