@@ -1,6 +1,6 @@
 {
   "name": "@matteodelseppia/assetto-diffx",
-  "version": "0.26.0",
+  "version": "0.27.0",
   "description": "Local code review tool for git diffs with a GitHub PR-like web UI",
   "type": "module",
   "license": "MIT",
