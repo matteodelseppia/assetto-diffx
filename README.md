@@ -129,8 +129,16 @@ npx skills add matteodelseppia/assetto-diffx
 
 The review workflow uses two commands:
 
-1. **`/assetto-diffx-start-review`** — Launches the assetto-diffx server and opens the browser. Review your changes and leave inline comments.
-2. **`/assetto-diffx-finish-review`** — The agent fetches all comments from the running assetto-diffx server via API, applies the requested changes, and marks each comment as resolved. The browser UI updates in real time as comments are resolved.
+1. **`/assetto-diffx-start-review`** — Launches the assetto-diffx server and opens the browser. Review your changes and leave inline comments; the agent answers each one as you post it, without waiting for the review to be closed. The browser UI updates in real time as replies come in and comments are resolved.
+2. **`/assetto-diffx-finish-review`** — A one-off sweep of everything still open, for closing out a session or catching up on comments left while no agent was listening.
+
+The live loop is driven by `GET /api/comments/pending`, which holds the request open until a thread is waiting on an answer:
+
+```bash
+curl -s "http://localhost:<port>/api/comments/pending?since=<version>&timeout=60000"
+```
+
+It returns `{ "version": <n>, "comments": [...] }` with every thread whose last message came from the reviewer — so comments posted in quick succession all arrive together and none is dropped. Passing the returned `version` back as `since` makes the next request block until something actually changes. A thread stops being pending as soon as the agent replies to it, and comes back the moment the reviewer follows up.
 
 ## Development
 
