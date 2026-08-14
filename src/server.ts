@@ -8,7 +8,7 @@ import { getGitDiff, getCustomGitDiff, getRangeDiff, getRecentCommits, isKnownCo
 import { loadSettings, saveSettings } from './settings.js'
 import { InMemoryCommentStore } from './comments.js'
 import type { CommentStore } from './comments.js'
-import type { ReviewComment } from './types.js'
+import type { CommentReply, ReviewComment } from './types.js'
 import { isSafePath } from './path.js'
 
 const MIME_TYPES: Record<string, string> = {
@@ -162,6 +162,29 @@ export function parseCommentInput(payload: unknown): { input: CommentInput } | {
       body: body.body,
     },
   }
+}
+
+/** A reply payload that has been checked before anything is stored. */
+export interface ReplyInput {
+  body: string
+  author: CommentReply['author']
+}
+
+/**
+ * Checks a posted reply. The coding agent replies with a plain `{ body }` — it
+ * is the only writer that reaches the API directly — so an absent author is
+ * read as the agent; the page sends its own author explicitly.
+ */
+export function parseReplyInput(payload: unknown): { input: ReplyInput } | { error: string } {
+  if (typeof payload !== 'object' || payload === null) {
+    return { error: 'Body must be a JSON object' }
+  }
+  const body = payload as Record<string, unknown>
+  if (!isNonEmptyString(body.body)) return { error: 'body must be a non-empty string' }
+  if (body.author !== undefined && body.author !== 'user' && body.author !== 'agent') {
+    return { error: "author must be 'user' or 'agent'" }
+  }
+  return { input: { body: body.body, author: (body.author as ReplyInput['author'] | undefined) ?? 'agent' } }
 }
 
 /** Number of commits offered in the browser's range picker. */
@@ -420,11 +443,21 @@ export function createApp(
 
   app.post('/api/comments/:id/replies', async (c) => {
     const commentId = c.req.param('id')
-    const { body } = await c.req.json()
+    let payload: unknown
+    try {
+      payload = await c.req.json()
+    } catch {
+      return c.json({ error: 'Body must be JSON' }, 400)
+    }
+    const parsed = parseReplyInput(payload)
+    if ('error' in parsed) {
+      return c.json({ error: parsed.error }, 400)
+    }
     const reply = {
       id: crypto.randomUUID(),
-      body,
+      body: parsed.input.body,
       createdAt: Date.now(),
+      author: parsed.input.author,
     }
     const updated = await store.addReply(commentId, reply)
     if (!updated) return c.json({ error: 'Comment not found' }, 404)

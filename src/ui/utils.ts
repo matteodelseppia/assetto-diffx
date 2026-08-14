@@ -64,6 +64,13 @@ export function formatComments(comments: ReviewComment[]): string {
       const prefix = comment.side === 'additions' ? '+' : '-'
       lines.push(`<code>${comment.lineContents.map((line) => `${prefix} ${line}`).join('\n')}</code>`)
       lines.push(comment.body)
+      // The thread is part of the request: the agent needs what has already
+      // been answered, and what the reviewer replied to it.
+      for (const reply of comment.replies ?? []) {
+        lines.push(`<reply author="${reply.author === 'user' ? 'user' : 'agent'}">`)
+        lines.push(reply.body)
+        lines.push('</reply>')
+      }
       lines.push('</comment>')
     }
     lines.push('</file>')

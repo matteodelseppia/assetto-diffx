@@ -72,14 +72,23 @@ describe('InMemoryCommentStore', () => {
 
   it('appends replies to a comment', async () => {
     await store.add(makeComment())
-    const updated = await store.addReply('c1', { id: 'r1', body: 'agreed', createdAt: 1 })
-    expect(updated?.replies).toEqual([{ id: 'r1', body: 'agreed', createdAt: 1 }])
-    await store.addReply('c1', { id: 'r2', body: 'done', createdAt: 2 })
+    const updated = await store.addReply('c1', { id: 'r1', body: 'agreed', createdAt: 1, author: 'agent' })
+    expect(updated?.replies).toEqual([{ id: 'r1', body: 'agreed', createdAt: 1, author: 'agent' }])
+    await store.addReply('c1', { id: 'r2', body: 'done', createdAt: 2, author: 'agent' })
     const [comment] = await store.getAll()
     expect(comment.replies.map((r) => r.id)).toEqual(['r1', 'r2'])
   })
 
+  it('keeps a back-and-forth thread in order, with each side attributed', async () => {
+    await store.add(makeComment())
+    await store.addReply('c1', { id: 'r1', body: 'done', createdAt: 1, author: 'agent' })
+    await store.addReply('c1', { id: 'r2', body: 'and the other one?', createdAt: 2, author: 'user' })
+    await store.addReply('c1', { id: 'r3', body: 'done too', createdAt: 3, author: 'agent' })
+    const [comment] = await store.getAll()
+    expect(comment.replies.map((r) => r.author)).toEqual(['agent', 'user', 'agent'])
+  })
+
   it('returns null when replying to a missing comment', async () => {
-    expect(await store.addReply('nope', { id: 'r1', body: 'hi', createdAt: 1 })).toBeNull()
+    expect(await store.addReply('nope', { id: 'r1', body: 'hi', createdAt: 1, author: 'user' })).toBeNull()
   })
 })

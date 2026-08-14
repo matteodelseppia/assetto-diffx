@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseCommentInput } from '../../src/server.js'
+import { parseCommentInput, parseReplyInput } from '../../src/server.js'
 
 const valid = {
   filePath: 'src/a.ts',
@@ -78,5 +78,36 @@ describe('parseCommentInput', () => {
   it('rejects a payload that is not an object', () => {
     expect(error(null)).toMatch(/JSON object/)
     expect(error('a comment')).toMatch(/JSON object/)
+  })
+})
+
+describe('parseReplyInput', () => {
+  function replyError(payload: unknown): string {
+    const result = parseReplyInput(payload)
+    expect(result, JSON.stringify(payload)).toHaveProperty('error')
+    return (result as { error: string }).error
+  }
+
+  it('reads the reviewer\'s own reply', () => {
+    expect(parseReplyInput({ body: 'still unclear', author: 'user' })).toEqual({
+      input: { body: 'still unclear', author: 'user' },
+    })
+  })
+
+  it('attributes a reply with no author to the agent', () => {
+    expect(parseReplyInput({ body: 'done' })).toEqual({ input: { body: 'done', author: 'agent' } })
+  })
+
+  it('rejects an empty reply', () => {
+    expect(replyError({ body: '   ' })).toMatch(/body/)
+    expect(replyError({ author: 'user' })).toMatch(/body/)
+  })
+
+  it('rejects an unknown author', () => {
+    expect(replyError({ body: 'hi', author: 'reviewer' })).toMatch(/author/)
+  })
+
+  it('rejects a payload that is not an object', () => {
+    expect(replyError(null)).toMatch(/JSON object/)
   })
 })

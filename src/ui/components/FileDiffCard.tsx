@@ -27,6 +27,7 @@ interface FileDiffCardProps {
   onTargetChange: (filePath: string, target: CommentTarget | null) => void
   onAddComment: (comment: NewComment) => void
   onDeleteComment: (id: string) => void
+  onReplyComment: (id: string, body: string) => void
 }
 
 export const FileDiffCard = memo(function FileDiffCard({
@@ -46,6 +47,7 @@ export const FileDiffCard = memo(function FileDiffCard({
   onTargetChange,
   onAddComment,
   onDeleteComment,
+  onReplyComment,
 }: FileDiffCardProps) {
   // Once a range has been handed to the comment form, the form owns it and the
   // diff carries no selection: a leftover one would make the next gutter drag
@@ -179,6 +181,7 @@ export const FileDiffCard = memo(function FileDiffCard({
                 <CommentBubble
                   comment={annotation.metadata as ReviewComment}
                   onDelete={onDeleteComment}
+                  onReply={onReplyComment}
                 />
               )
             }}

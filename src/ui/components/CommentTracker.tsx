@@ -28,9 +28,15 @@ function scrollToComment(comment: ReviewComment): void {
   document.getElementById(`file-${comment.filePath}`)?.scrollIntoView({ block: 'start' })
 }
 
+/**
+ * A thread counts as replied only while the agent had the last word: once the
+ * reviewer answers back, the comment is waiting on the agent again and reads as
+ * open.
+ */
 function getCommentStatus(comment: ReviewComment): CommentStatus {
   if (comment.status === 'resolved') return 'resolved'
-  if (comment.replies?.length > 0) return 'replied'
+  const last = comment.replies?.[comment.replies.length - 1]
+  if (last && last.author !== 'user') return 'replied'
   return 'open'
 }
 
