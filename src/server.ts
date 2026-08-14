@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { join, extname, resolve } from 'node:path'
+import { timingSafeEqual } from 'node:crypto'
 import { Hono } from 'hono'
+import { getCookie, setCookie } from 'hono/cookie'
 import { serve } from '@hono/node-server'
 import { getGitDiff, getCustomGitDiff, getRangeDiff, getRecentCommits, isKnownCommit, areLinesPresentInWorktree, getRepoName, getBranchName, getFileContent, getBlobContent, getWorktreeFileContent, getTabSizeForFiles, getUntrackedFilePaths } from './git.js'
 import { loadSettings, saveSettings } from './settings.js'
@@ -117,11 +119,47 @@ export function parseRangeQuery(
   return { base, head }
 }
 
-export function createApp(clientDir: string, customDiffArgs?: string[], commentStore?: CommentStore) {
+/** Cookie the browser keeps the access token in once it has followed the link. */
+export const TOKEN_COOKIE = 'assetto_diffx_token'
+
+function tokenMatches(expected: string, provided: string | undefined): boolean {
+  if (!provided || provided.length !== expected.length) return false
+  return timingSafeEqual(Buffer.from(provided), Buffer.from(expected))
+}
+
+export function createApp(
+  clientDir: string,
+  customDiffArgs?: string[],
+  commentStore?: CommentStore,
+  /**
+   * Required on every request when set. The CLI generates one whenever the
+   * server is bound past loopback, where the repository would otherwise be
+   * readable and commentable by anyone who can reach the port.
+   */
+  authToken?: string,
+) {
   const app = new Hono()
   const isCustomMode = !!customDiffArgs
   const store = commentStore ?? new InMemoryCommentStore()
   const viewedFiles = new Map<string, string>()
+
+  if (authToken) {
+    app.use('*', async (c, next) => {
+      // The token arrives in the link the CLI prints; it is exchanged for a
+      // cookie so the page's own asset and API requests carry it from then on.
+      const fromQuery = c.req.query('token')
+      const provided = fromQuery ?? c.req.header('x-auth-token') ?? getCookie(c, TOKEN_COOKIE)
+      if (!tokenMatches(authToken, provided)) {
+        return c.text('Unauthorized', 401)
+      }
+      await next()
+      // After the handler: a route that returns a Response of its own replaces
+      // the one the cookie would have been written to.
+      if (fromQuery) {
+        setCookie(c, TOKEN_COOKIE, authToken, { path: '/', httpOnly: true, sameSite: 'Strict' })
+      }
+    })
+  }
 
   // An explicit range picked in the browser wins over both the CLI's custom
   // diff arguments and the working-tree default.
@@ -342,13 +380,19 @@ export function createApp(clientDir: string, customDiffArgs?: string[], commentS
   return app
 }
 
+/** Whether a bind address is reachable only from this machine. */
+export function isLoopbackHost(host: string): boolean {
+  return host.startsWith('127.') || host === 'localhost' || host === '::1' || host === '[::1]'
+}
+
 export function startServer(options: {
   port: number
   host: string
   clientDir: string
   customDiffArgs?: string[]
+  authToken?: string
 }): Promise<{ port: number }> {
-  const app = createApp(options.clientDir, options.customDiffArgs)
+  const app = createApp(options.clientDir, options.customDiffArgs, undefined, options.authToken)
 
   return new Promise((resolveStarted) => {
     serve({

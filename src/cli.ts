@@ -3,9 +3,10 @@ import { parseArgs } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { readFileSync } from 'node:fs'
+import { randomBytes } from 'node:crypto'
 import getPort from 'get-port'
 import { isGitRepo } from './git.js'
-import { startServer } from './server.js'
+import { startServer, isLoopbackHost } from './server.js'
 import { loadSettings } from './settings.js'
 
 const { values, positionals } = parseArgs({
@@ -27,7 +28,9 @@ Usage: assetto-diffx [options] [-- <git diff args>]
 Options:
   -p, --port <port>  Port to run the server on (default: random available port)
   --host <host>      Host address to bind to (default: 127.0.0.1). Pass
-                     0.0.0.0 to expose the server to the local network.
+                     0.0.0.0 to expose the server to the local network — the
+                     printed URL then carries an access token that every
+                     request needs.
   --no-open          Don't open the browser automatically
   -v, --version      Show version number
   -h, --help         Show this help message
@@ -66,16 +69,25 @@ const resolvedClientDir = existsSync(clientDir)
   ? clientDir
   : resolve(process.cwd(), 'dist/client')
 
-const { port: actualPort } = await startServer({ port, host, clientDir: resolvedClientDir, customDiffArgs })
+// Bound past loopback the server is reachable by every device that can route
+// here, so it stops being open: the token is the reviewer's link, and requests
+// without it are refused.
+const authToken = isLoopbackHost(host) ? undefined : randomBytes(24).toString('hex')
 
-const localUrl = `http://${host}:${actualPort}`
+const { port: actualPort } = await startServer({ port, host, clientDir: resolvedClientDir, customDiffArgs, authToken })
+
+const query = authToken ? `/?token=${authToken}` : ''
+const localUrl = `http://${host}:${actualPort}${query}`
 
 console.log(`assetto-diffx server running at ${localUrl}`)
+if (authToken) {
+  console.log('This link grants access to the repository diff and comments — share it only with your reviewers.')
+}
 
 if (!values['no-open']) {
   const settings = loadSettings()
   const openHost = host === '0.0.0.0' ? '127.0.0.1' : host
-  const openUrl = `http://${openHost}:${actualPort}`
+  const openUrl = `http://${openHost}:${actualPort}${query}`
   const openModule = await import('open')
   let appName: string | readonly string[] | undefined
   if (settings.browser) {
