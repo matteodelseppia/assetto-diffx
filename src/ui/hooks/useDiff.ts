@@ -38,14 +38,28 @@ export function useDiff(options: DiffOptions, range: CommitRange) {
       ...rangeParams({ base, head }),
     })
 
-    fetch(`/api/diff?${params}`)
+    // Switching range or toggling an option while a request is in flight leaves
+    // overlapping requests that can resolve out of order. Abort the superseded
+    // one so its response — or its failure — never overwrites the selection the
+    // reviewer is actually looking at.
+    const controller = new AbortController()
+
+    fetch(`/api/diff?${params}`, { signal: controller.signal })
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.json()
       })
       .then((json) => setData(json))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false))
+      .catch((err) => {
+        if (controller.signal.aborted) return
+        setError(err.message)
+      })
+      .finally(() => {
+        // The newer request owns the loading state from here on.
+        if (!controller.signal.aborted) setLoading(false)
+      })
+
+    return () => controller.abort()
   }, [options.staged, options.untracked, base, head])
 
   return {
