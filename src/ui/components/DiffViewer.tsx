@@ -4,6 +4,7 @@ import type { ReviewComment } from '../../types'
 import type { BinaryFileInfo } from '../hooks/useDiff'
 import type { NewComment } from '../hooks/useComments'
 import type { CommentTarget } from '../utils'
+import type { CommitRange } from '../hooks/useCommits'
 import { FileDiffCard } from './FileDiffCard'
 import { BinaryFileDiff } from './BinaryFileDiff'
 
@@ -15,6 +16,7 @@ interface DiffViewerProps {
   softWrap: boolean
   viewedFiles: Set<string>
   binaryFiles: Map<string, BinaryFileInfo>
+  range: CommitRange
   onViewedChange: (filePath: string, viewed: boolean) => void
   fileAnnotationsMap: Map<string, DiffLineAnnotation<ReviewComment>[]>
   onAddComment: (comment: NewComment) => void
@@ -42,6 +44,7 @@ export const DiffViewer = memo(function DiffViewer({
   softWrap,
   viewedFiles,
   binaryFiles,
+  range,
   onViewedChange,
   fileAnnotationsMap,
   onAddComment,
@@ -101,6 +104,7 @@ export const DiffViewer = memo(function DiffViewer({
               filePath={filePath}
               info={binaryInfo}
               viewed={viewedFiles.has(filePath)}
+              range={range}
               onViewedChange={onViewedChange}
             />
           )

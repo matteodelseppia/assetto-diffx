@@ -27,22 +27,26 @@ function isBinaryFile(absolutePath: string): boolean {
   }
 }
 
-export function getFileContent(filePath: string, version: 'old' | 'new'): Buffer | null {
+/**
+ * Raw contents of `filePath` at `revision`, or from the working tree when
+ * `revision` is omitted. `revision` is passed to git as part of a revision
+ * argument, so callers must only ever pass a revision they validated with
+ * {@link isKnownCommit} (or the literal `HEAD`).
+ */
+export function getFileContent(filePath: string, revision?: string): Buffer | null {
   const root = getRepoRoot()
   if (!isSafePath(filePath, root)) {
     return null
   }
-  const resolved = resolve(root, filePath)
-  if (version === 'new') {
+  if (revision === undefined) {
     try {
-      return readFileSync(resolved)
+      return readFileSync(resolve(root, filePath))
     } catch {
       return null
     }
   }
-  // old version: try staged first, then HEAD
   try {
-    return execFileSync('git', ['show', `HEAD:${filePath}`], { stdio: 'pipe', maxBuffer: 50 * 1024 * 1024 })
+    return execFileSync('git', ['show', `${revision}:${filePath}`], { stdio: 'pipe', maxBuffer: 50 * 1024 * 1024 })
   } catch {
     return null
   }
