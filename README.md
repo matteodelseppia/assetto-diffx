@@ -7,7 +7,7 @@ A local code review tool designed for the coding agent workflow. Review AI-gener
 ## Install
 
 ```bash
-npm install -g assetto-diffx
+npm install -g @matteodelseppia/assetto-diffx
 ```
 
 ## Usage
