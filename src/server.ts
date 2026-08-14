@@ -6,7 +6,7 @@ import { getCookie, setCookie } from 'hono/cookie'
 import { serve } from '@hono/node-server'
 import { getGitDiff, getCustomGitDiff, getRangeDiff, getRecentCommits, isKnownCommit, areLinesPresentInWorktree, getRepoName, getBranchName, getFileContent, getBlobContent, getWorktreeFileContent, getTabSizeForFiles, getUntrackedFilePaths } from './git.js'
 import { loadSettings, saveSettings } from './settings.js'
-import { InMemoryCommentStore } from './comments.js'
+import { InMemoryCommentStore, CommentWatch, awaitingAgent } from './comments.js'
 import type { CommentStore } from './comments.js'
 import type { CommentReply, ReviewComment } from './types.js'
 import { isSafePath } from './path.js'
@@ -187,6 +187,38 @@ export function parseReplyInput(payload: unknown): { input: ReplyInput } | { err
   return { input: { body: body.body, author: (body.author as ReplyInput['author'] | undefined) ?? 'agent' } }
 }
 
+/** How long an agent's long poll waits for a comment before coming back empty. */
+export const DEFAULT_WAIT_MS = 30_000
+/** Upper bound on that wait, so a request can never park for good. */
+export const MAX_WAIT_MS = 300_000
+
+export interface WaitQuery {
+  /** The version the caller last saw; it is told about anything newer. */
+  since: number
+  timeoutMs: number
+}
+
+/**
+ * Reads the `since`/`timeout` query parameters of the agent's long poll.
+ * Absent parameters mean "whatever there is, right now, for up to the default
+ * wait" — the shape of a first call.
+ */
+export function parseWaitQuery(since: string | undefined, timeout: string | undefined): WaitQuery | { error: string } {
+  let sinceVersion = 0
+  if (since !== undefined) {
+    const parsed = Number(since)
+    if (!Number.isInteger(parsed) || parsed < 0) return { error: 'since must be a non-negative integer' }
+    sinceVersion = parsed
+  }
+  let timeoutMs = DEFAULT_WAIT_MS
+  if (timeout !== undefined) {
+    const parsed = Number(timeout)
+    if (!Number.isInteger(parsed) || parsed < 0) return { error: 'timeout must be a non-negative integer' }
+    timeoutMs = Math.min(parsed, MAX_WAIT_MS)
+  }
+  return { since: sinceVersion, timeoutMs }
+}
+
 /** Number of commits offered in the browser's range picker. */
 export const COMMIT_LIST_LIMIT = 100
 
@@ -236,6 +268,7 @@ export function createApp(
   const app = new Hono()
   const isCustomMode = !!customDiffArgs
   const store = commentStore ?? new InMemoryCommentStore()
+  const watch = new CommentWatch()
   const viewedFiles = new Map<string, string>()
 
   if (authToken) {
@@ -390,6 +423,42 @@ export function createApp(
     return c.json(comments)
   })
 
+  /**
+   * The agent's live feed of work. It holds the request open until a thread is
+   * waiting on an answer, so a comment reaches the agent as soon as it is
+   * posted instead of at the end of the review. Every waiting thread is
+   * returned together, which is what keeps a burst of comments posted at once
+   * from losing any of them.
+   */
+  app.get('/api/comments/pending', async (c) => {
+    const parsed = parseWaitQuery(c.req.query('since'), c.req.query('timeout'))
+    if ('error' in parsed) {
+      return c.json({ error: parsed.error }, 400)
+    }
+    return c.json(await collectPending(parsed.since, Date.now() + parsed.timeoutMs))
+  })
+
+  /**
+   * Waits for threads the agent has not answered, up to `deadline`. The version
+   * is read before the threads are, so a comment posted while they are being
+   * read is a version the wait already knows to skip past instead of sleeping
+   * through. Coming back empty means the wait ran out, not that the caller
+   * should stop asking.
+   */
+  async function collectPending(since: number, deadline: number): Promise<{ version: number; comments: ReviewComment[] }> {
+    const version = watch.currentVersion
+    const comments = awaitingAgent(await store.getAll())
+    if (version > since && comments.length > 0) {
+      return { version, comments }
+    }
+    const remaining = deadline - Date.now()
+    if (remaining <= 0) {
+      return { version, comments: [] }
+    }
+    await watch.waitForChange(version, remaining)
+    return collectPending(since, deadline)
+  }
+
   app.post('/api/comments', async (c) => {
     let payload: unknown
     try {
@@ -430,6 +499,7 @@ export function createApp(
       replies: [],
     }
     const created = await store.add(comment)
+    watch.bump()
     return c.json(created, 201)
   })
 
@@ -438,6 +508,7 @@ export function createApp(
     const { body, status } = await c.req.json()
     const updated = await store.update(id, { body, status })
     if (!updated) return c.json({ error: 'Comment not found' }, 404)
+    watch.bump()
     return c.json(updated)
   })
 
@@ -461,6 +532,7 @@ export function createApp(
     }
     const updated = await store.addReply(commentId, reply)
     if (!updated) return c.json({ error: 'Comment not found' }, 404)
+    watch.bump()
     return c.json(updated)
   })
 
@@ -468,6 +540,7 @@ export function createApp(
     const id = c.req.param('id')
     const removed = await store.remove(id)
     if (!removed) return c.json({ error: 'Comment not found' }, 404)
+    watch.bump()
     return c.json({ ok: true })
   })
 

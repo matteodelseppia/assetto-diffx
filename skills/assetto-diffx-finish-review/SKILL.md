@@ -8,6 +8,8 @@ user_invocable: true
 
 Fetch all review comments from the running assetto-diffx server, apply the requested changes, and mark each comment as resolved.
 
+This is the one-off sweep, for catching up on everything left open. `/assetto-diffx-start-review` answers comments live as they are posted and is the normal way to work; use this one to close out a session, or when the live loop was not running while the user commented.
+
 ## What to do
 
 ### 1. Fetch comments from the API
