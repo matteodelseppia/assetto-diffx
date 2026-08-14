@@ -89,6 +89,7 @@ export function CommentTracker({ comments }: CommentTrackerProps) {
                 href={`#comment-${comment.id}`}
                 className="ct-item-link"
                 onClick={(e) => {
+                  if (window.getSelection()?.toString()) return
                   e.preventDefault()
                   scrollToComment(comment)
                 }}
