@@ -66,3 +66,32 @@ jobs:
         run: pnpm run build
       - name: System tests
         run: pnpm run test:system
+
+  release:
+    name: Bump version
+    needs: [quality, unit-tests, system-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Bump version
+        run: npm version minor --no-git-tag-version
+      - name: Commit and tag
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: release v$VERSION [skip ci]"
+          git tag "v$VERSION"
+          git push origin HEAD:main
+          git push origin "v$VERSION"
