@@ -1,6 +1,7 @@
 # assetto-diffx
 
 [![CI](https://github.com/matteodelseppia/assetto-diffx/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/matteodelseppia/assetto-diffx/actions/workflows/ci.yml)
+[![CD](https://github.com/matteodelseppia/assetto-diffx/actions/workflows/cd.yml/badge.svg?branch=main)](https://github.com/matteodelseppia/assetto-diffx/actions/workflows/cd.yml)
 
 A local code review tool designed for the coding agent workflow. Review AI-generated changes in a GitHub PR-like web UI, leave inline comments, then hand them back to your coding agent to fix.
 
