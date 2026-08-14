@@ -125,12 +125,24 @@ describe('/api/comments', () => {
     })
     expect(edited.body).toBe('why not 43?')
 
-    const replied = await json<{ replies: { body: string }[] }>(`/api/comments/${created.id}/replies`, {
+    const replied = await json<{ replies: { body: string; author: string }[] }>(`/api/comments/${created.id}/replies`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ body: 'because' }),
     })
     expect(replied.replies.map((r) => r.body)).toEqual(['because'])
+    // The agent posts a bare body; the page says who is writing.
+    expect(replied.replies.map((r) => r.author)).toEqual(['agent'])
+
+    const followedUp = await json<{ replies: { body: string; author: string }[] }>(
+      `/api/comments/${created.id}/replies`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: 'why not 43 then?', author: 'user' }),
+      },
+    )
+    expect(followedUp.replies.map((r) => r.author)).toEqual(['agent', 'user'])
 
     const resolved = await json<{ status: string }>(`/api/comments/${created.id}`, {
       method: 'PUT',
@@ -163,6 +175,31 @@ describe('/api/comments', () => {
 
     // Nothing of the above reached the store.
     expect(await json<unknown[]>('/api/comments')).toEqual([])
+  })
+
+  it('refuses a reply that is empty or wrongly attributed', async () => {
+    const created = await json<{ id: string }>('/api/comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filePath: 'src/modified.ts',
+        side: 'additions',
+        lineNumber: 1,
+        lineContents: ['export const value = 42'],
+        body: 'why 42?',
+      }),
+    })
+    const reply = (payload: unknown) =>
+      api(`/api/comments/${created.id}/replies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+    expect((await reply({ body: '  ' })).status).toBe(400)
+    expect((await reply({ body: 'hi', author: 'somebody' })).status).toBe(400)
+
+    expect((await api(`/api/comments/${created.id}`, { method: 'DELETE' })).status).toBe(200)
   })
 
   it('refuses a body that is not JSON', async () => {

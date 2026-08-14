@@ -108,6 +108,20 @@ describe('formatComments', () => {
     )
   })
 
+  it('carries the thread, attributing each reply', () => {
+    const text = formatComments([
+      makeComment({
+        replies: [
+          { id: 'r1', body: 'renamed it', createdAt: 1, author: 'agent' },
+          { id: 'r2', body: 'the other one too, please', createdAt: 2, author: 'user' },
+        ],
+      }),
+    ])
+    expect(text).toContain('<reply author="agent">\nrenamed it\n</reply>')
+    expect(text).toContain('<reply author="user">\nthe other one too, please\n</reply>')
+    expect(text.indexOf('renamed it')).toBeLessThan(text.indexOf('the other one too'))
+  })
+
   it('quotes every line of a range comment', () => {
     const text = formatComments([
       makeComment({

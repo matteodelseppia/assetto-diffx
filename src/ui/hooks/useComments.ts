@@ -83,6 +83,18 @@ export function useComments() {
     onSuccess: (updated) => patchComments((prev) => prev.map((c) => (c.id === updated.id ? updated : c))),
   })
 
+  const replyMutation = useMutation({
+    mutationFn: async ({ id, body }: { id: string; body: string }) => {
+      const res = await fetch(`/api/comments/${id}/replies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body, author: 'user' }),
+      })
+      return res.json() as Promise<ReviewComment>
+    },
+    onSuccess: (updated) => patchComments((prev) => prev.map((c) => (c.id === updated.id ? updated : c))),
+  })
+
   const addComment = useCallback(
     (comment: NewComment) => {
       addMutation.mutate(comment)
@@ -104,6 +116,13 @@ export function useComments() {
       editMutation.mutate({ id, body })
     },
     [editMutation],
+  )
+
+  const replyToComment = useCallback(
+    (id: string, body: string) => {
+      replyMutation.mutate({ id, body })
+    },
+    [replyMutation],
   )
 
   const resolveComment = useCallback(
@@ -140,6 +159,7 @@ export function useComments() {
     addComment,
     removeComment,
     editComment,
+    replyToComment,
     resolveComment,
     getAnnotationsForFile,
     formatAllComments,

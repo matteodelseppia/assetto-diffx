@@ -39,7 +39,7 @@ export function App() {
     { staged: settings.staged, untracked: settings.untracked },
     range,
   )
-  const { comments, addComment, removeComment, copyAllComments, addError, dismissAddError } =
+  const { comments, addComment, removeComment, replyToComment, copyAllComments, addError, dismissAddError } =
     useComments()
   const [activeCard, setActiveCard] = useState<string | null>(null)
   const [sidebar, setSidebar] = useState(() => SidebarStorage.load())
@@ -265,6 +265,7 @@ export function App() {
               fileAnnotationsMap={fileAnnotationsMap}
               onAddComment={addComment}
               onDeleteComment={removeComment}
+              onReplyComment={replyToComment}
             />
           </Virtualizer>
         </main>

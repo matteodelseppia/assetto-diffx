@@ -34,14 +34,18 @@ The response is a JSON array of comment objects:
     "body": "Rename x to parsedToken for clarity",
     "status": "open",
     "createdAt": 1234567890,
-    "replies": []
+    "replies": [
+      { "id": "uuid", "body": "Why not a Map here?", "createdAt": 1234567891, "author": "user" }
+    ]
   }
 ]
 ```
 
+Each reply carries an `author`: `"agent"` for your own earlier replies, `"user"` for the reviewer's. A thread whose last reply is from the user is a follow-up waiting on you, even if you already answered it once.
+
 ### 2. Process each comment
 
-For each comment with `"status": "open"`, first determine the intent — is it a **change request** or a **question**?
+For each comment with `"status": "open"`, read the whole thread — the `body` plus every reply in order — and determine what is being asked of you now. When the last reply is from the user, that follow-up is the request; the original `body` is context. Then decide: is it a **change request** or a **question**?
 
 #### Change requests (e.g., "Rename x to parsedToken", "Extract this into a helper")
 
@@ -76,9 +80,12 @@ The `side` field tells you whether the comment is on an added line (`additions`)
 
 A comment can cover a range of lines: `startLineNumber` is its first line and `lineNumber` its last, and `lineContents` holds the content of every line in between. They are equal for a single-line comment.
 
+A reply posted this way is recorded as coming from the agent; the reviewer can answer it from the page, and the thread can go back and forth any number of times.
+
 ### 3. Handle edge cases
 
 - If a comment is ambiguous, reply to ask for clarification rather than guessing.
+- A thread you have already replied to may have a newer user reply. Answer that one; do not repeat work you have already done.
 - If multiple comments interact (e.g., a rename that affects several places), handle them together.
 - If there are no open comments, tell the user there's nothing to process.
 

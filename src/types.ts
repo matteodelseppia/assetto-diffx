@@ -2,6 +2,8 @@ export interface CommentReply {
   id: string
   body: string
   createdAt: number
+  /** Who wrote the reply. Replies posted through the API default to the agent. */
+  author: 'user' | 'agent'
 }
 
 export interface ReviewComment {
