@@ -9,7 +9,8 @@ import { useCommits, DEFAULT_RANGE, type CommitRange } from './hooks/useCommits'
 import { useComments } from './hooks/useComments'
 import { useSettings } from './hooks/useSettings'
 import { useViewed } from './hooks/useViewed'
-import { useFullDiffs, fileKey } from './hooks/useFullDiffs'
+import { useFullDiffs } from './hooks/useFullDiffs'
+import { buildEntryIds, entryKey, type DiffEntry } from './fileTree'
 import { Toolbar } from './components/Toolbar'
 import { DiffViewer } from './components/DiffViewer'
 import { FileTree } from './components/FileTree'
@@ -40,7 +41,7 @@ export function App() {
   )
   const { comments, addComment, removeComment, copyAllComments, addError, dismissAddError } =
     useComments()
-  const [activeFile, setActiveFile] = useState<string | null>(null)
+  const [activeCard, setActiveCard] = useState<string | null>(null)
   const [sidebar, setSidebar] = useState(() => SidebarStorage.load())
   const maxSidebarWidth = Math.max(SidebarStorage.minSize, useWindowSize({ factor: 0.5 }))
 
@@ -64,9 +65,13 @@ export function App() {
       const parsed = parsePatchFiles(patch)
       const parsedFiles = parsed.flatMap((p) => p.files)
 
+      // A binary file edited both staged and unstaged is reported twice, but it
+      // has no contents to tell the two apart — one card says everything there
+      // is to say about it.
       const existingNames = new Set(parsedFiles.map((f) => f.name))
       for (const bf of binaryFiles) {
         if (!existingNames.has(bf.path)) {
+          existingNames.add(bf.path)
           const syntheticFile: FileDiffMetadata = {
             name: bf.path,
             type: bf.type === 'added' || bf.type === 'untracked' ? 'new' : bf.type === 'deleted' ? 'deleted' : 'change',
@@ -88,9 +93,15 @@ export function App() {
   }, [patch, binaryFiles])
 
   const fullFiles = useFullDiffs(patch, files, { staged: settings.staged, untracked: settings.untracked }, range)
-  const displayFiles = useMemo(() => {
-    if (fullFiles.size === 0) return files
-    return files.map((f) => fullFiles.get(fileKey(f)) ?? f)
+  // Ids are derived from the patch-parsed files and carried alongside the
+  // (possibly upgraded) diff, so the sidebar and the cards always agree on which
+  // entry is which — even when one path has both a staged and an unstaged entry.
+  const entries = useMemo((): DiffEntry[] => {
+    const ids = buildEntryIds(files)
+    return files.map((file) => {
+      const key = entryKey(file)
+      return { file: fullFiles.get(key) ?? file, domId: ids.get(key) ?? `file-${file.name}` }
+    })
   }, [files, fullFiles])
 
   const { viewedFiles, setViewed } = useViewed(files)
@@ -139,9 +150,9 @@ export function App() {
     return map
   }, [comments])
 
-  const handleFileClick = useCallback((filePath: string) => {
-    setActiveFile(filePath)
-    const el = document.getElementById(`file-${filePath}`)
+  const handleFileClick = useCallback((domId: string) => {
+    setActiveCard(domId)
+    const el = document.getElementById(domId)
     if (el) {
       el.scrollIntoView({ block: 'start' })
     }
@@ -154,8 +165,8 @@ export function App() {
   const sidebarContent = (
     <div className="sidebar-content">
       <FileTree
-        files={files}
-        activeFile={activeFile}
+        entries={entries}
+        activeCard={activeCard}
         commentCounts={commentCounts}
         viewedFiles={viewedFiles}
         untrackedFiles={untrackedSet}
@@ -242,7 +253,7 @@ export function App() {
         <main className="main">
           <Virtualizer className="main-scroll" contentClassName="main-content">
             <DiffViewer
-              files={displayFiles}
+              entries={entries}
               diffStyle={settings.diffStyle}
               tabSizeMap={tabSizeMap}
               defaultTabSize={settings.defaultTabSize}

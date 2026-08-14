@@ -2,12 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { processFile } from '@pierre/diffs'
 import type { FileDiffMetadata } from '@pierre/diffs'
 import { rangeParams, type CommitRange } from './useCommits'
+import { entryKey } from '../fileTree'
 
 const ZERO_OID = /^0+$/
-
-export function fileKey(file: FileDiffMetadata): string {
-  return `${file.name}\0${file.prevObjectId ?? ''}\0${file.newObjectId ?? ''}`
-}
 
 // Derive the new-file path the same way @pierre/diffs builds `file.name`: from
 // the `+++ b/<path>` header (FILENAME_HEADER_REGEX_GIT). The `diff --git` line
@@ -58,7 +55,7 @@ function contentsMatchHunks(partial: FileDiffMetadata, full: FileDiffMetadata): 
 /**
  * Upgrades patch-parsed (partial) file diffs to full diffs by fetching the
  * complete old/new file contents, which enables hunk context expansion.
- * Returns a map from `fileKey(file)` to the upgraded metadata.
+ * Returns a map from `entryKey(file)` to the upgraded metadata.
  */
 export function useFullDiffs(
   patch: string | null,
@@ -85,7 +82,7 @@ export function useFullDiffs(
       if (file.type !== 'change' && file.type !== 'rename-changed') continue
       const prevOid = file.prevObjectId
       if (!prevOid || ZERO_OID.test(prevOid) || !file.newObjectId) continue
-      const key = fileKey(file)
+      const key = entryKey(file)
       if (requested.current.has(key)) continue
       const chunk = chunkMap.get(key)
       if (!chunk) continue

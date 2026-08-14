@@ -11,6 +11,7 @@ function isImage(filePath: string): boolean {
 }
 
 interface BinaryFileDiffProps {
+  id: string
   filePath: string
   info: BinaryFileInfo
   viewed: boolean
@@ -18,11 +19,11 @@ interface BinaryFileDiffProps {
   onViewedChange: (filePath: string, viewed: boolean) => void
 }
 
-export function BinaryFileDiff({ filePath, info, viewed, range, onViewedChange }: BinaryFileDiffProps) {
+export function BinaryFileDiff({ id, filePath, info, viewed, range, onViewedChange }: BinaryFileDiffProps) {
   const image = isImage(filePath)
 
   return (
-    <div className={`file-diff-card ${viewed ? 'file-diff-viewed' : ''}`} id={`file-${filePath}`}>
+    <div className={`file-diff-card ${viewed ? 'file-diff-viewed' : ''}`} id={id}>
       <div className="binary-diff-header">
         <span className="binary-diff-name">{filePath}</span>
         <label className="viewed-label" onClick={(e) => e.stopPropagation()}>
