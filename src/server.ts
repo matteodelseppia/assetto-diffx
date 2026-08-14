@@ -29,46 +29,64 @@ export interface BinaryFileInfo {
   type: 'added' | 'deleted' | 'changed' | 'untracked'
 }
 
+/** Splits a patch into one chunk per file. */
+function splitChunks(patch: string): string[] {
+  return patch.split(/^(?=diff --git )/m).filter((chunk) => chunk.startsWith('diff --git '))
+}
+
+/**
+ * The path a per-file chunk describes. `diff --git a/<old> b/<new>` is
+ * ambiguous for a path containing " b/", so the unambiguous headers are
+ * preferred: `+++ b/<path>`, `rename to <path>`, or — for a deletion, whose new
+ * side is /dev/null — `--- a/<path>`. A binary chunk has none of those, but its
+ * `diff --git` line can still be read whenever both sides are the same path,
+ * which fixes its length: everything but a rename.
+ */
+export function parseChunkPath(chunk: string): string | null {
+  const newHeader = chunk.match(/^\+\+\+ b\/([^\t\r\n]+)/m)
+  if (newHeader) return newHeader[1].trim()
+
+  const renameTo = chunk.match(/^rename to (.+)$/m)
+  if (renameTo) return renameTo[1].trim()
+
+  const oldHeader = chunk.match(/^--- a\/([^\t\r\n]+)/m)
+  if (oldHeader) return oldHeader[1].trim()
+
+  const gitLine = chunk.match(/^diff --git (.+)$/m)
+  if (gitLine) {
+    const sides = gitLine[1].trim()
+    // `a/<path> b/<path>` — the separators take five characters, so what
+    // remains splits evenly between the two identical paths.
+    if ((sides.length - 5) % 2 === 0) {
+      const path = sides.slice(2, 2 + (sides.length - 5) / 2)
+      if (sides === `a/${path} b/${path}`) return path
+    }
+  }
+
+  return null
+}
+
 export function parseFilePaths(patch: string): string[] {
   const paths = new Set<string>()
-  for (const line of patch.split('\n')) {
-    const match = line.match(/^diff --git a\/.+ b\/(.+)$/)
-    if (match) paths.add(match[1])
+  for (const chunk of splitChunks(patch)) {
+    const path = parseChunkPath(chunk)
+    if (path) paths.add(path)
   }
   return [...paths]
 }
 
 export function parseBinaryFiles(patch: string, untrackedFiles?: Set<string>): BinaryFileInfo[] {
   const binaryFiles: BinaryFileInfo[] = []
-  const lines = patch.split('\n')
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    if (!line.startsWith('Binary files ') || !line.includes(' differ')) continue
+  for (const chunk of splitChunks(patch)) {
+    const lines = chunk.split('\n')
+    if (!lines.some((line) => line.startsWith('Binary files ') && line.includes(' differ'))) continue
 
-    // Find the file path from the preceding diff --git line
-    let filePath = ''
-    for (let j = i - 1; j >= 0; j--) {
-      const match = lines[j].match(/^diff --git a\/.+ b\/(.+)$/)
-      if (match) {
-        filePath = match[1]
-        break
-      }
-    }
+    const filePath = parseChunkPath(chunk)
     if (!filePath) continue
 
-    // Determine change type from surrounding lines
     let changeType: BinaryFileInfo['type'] = 'changed'
-    for (let j = i - 1; j >= 0; j--) {
-      if (lines[j].startsWith('diff --git')) break
-      if (lines[j].startsWith('new file mode')) {
-        changeType = 'added'
-        break
-      }
-      if (lines[j].startsWith('deleted file mode')) {
-        changeType = 'deleted'
-        break
-      }
-    }
+    if (lines.some((line) => line.startsWith('new file mode'))) changeType = 'added'
+    else if (lines.some((line) => line.startsWith('deleted file mode'))) changeType = 'deleted'
 
     if (changeType === 'added' && untrackedFiles?.has(filePath)) {
       changeType = 'untracked'
