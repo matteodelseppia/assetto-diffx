@@ -1,5 +1,5 @@
 {
-  "name": "assetto-diffx",
+  "name": "@matteodelseppia/assetto-diffx",
   "version": "0.17.0",
   "description": "Local code review tool for git diffs with a GitHub PR-like web UI",
   "type": "module",
