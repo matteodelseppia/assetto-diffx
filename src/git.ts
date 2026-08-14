@@ -258,12 +258,26 @@ function getUntrackedFilesDiff(): string {
     } else {
       try {
         const content = readFileSync(absolutePath, 'utf-8')
-        const lines = content.split('\n')
-        const diffLines = lines.map((l: string) => `+${l}`)
-        const patch = [
+        const header = [
           `diff --git a/${file} b/${file}`,
           'new file mode 100644',
           'index 0000000..0000001',
+        ]
+        // An empty file has no hunk at all, the way git reports it.
+        if (content === '') {
+          patches.push(header.join('\n'))
+          continue
+        }
+        // A trailing newline terminates the last line rather than starting an
+        // empty one, so the element `split` leaves behind is not a line of the
+        // file; without a trailing newline git flags that instead.
+        const lines = content.split('\n')
+        const endsWithNewline = lines.at(-1) === ''
+        if (endsWithNewline) lines.pop()
+        const diffLines = lines.map((l: string) => `+${l}`)
+        if (!endsWithNewline) diffLines.push('\\ No newline at end of file')
+        const patch = [
+          ...header,
           '--- /dev/null',
           `+++ b/${file}`,
           `@@ -0,0 +1,${lines.length} @@`,
