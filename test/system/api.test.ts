@@ -143,6 +143,37 @@ describe('/api/comments', () => {
     expect(await json<unknown[]>('/api/comments')).toEqual([])
   })
 
+  it('refuses a comment that is missing what anchors it', async () => {
+    const post = (payload: unknown) =>
+      api('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+    // No line number and no path: what used to be stored as a comment with
+    // null line numbers and no file.
+    const bare = await post({ side: 'deletions', body: 'hi' })
+    expect(bare.status).toBe(400)
+    expect((await bare.json()).error).toMatch(/filePath/)
+
+    expect((await post({ filePath: 'src/modified.ts', side: 'deletions', body: 'hi' })).status).toBe(400)
+    expect((await post({ filePath: 'src/modified.ts', side: 'sideways', lineNumber: 1, body: 'hi' })).status).toBe(400)
+    expect((await post({ filePath: 'src/modified.ts', side: 'deletions', lineNumber: 1 })).status).toBe(400)
+
+    // Nothing of the above reached the store.
+    expect(await json<unknown[]>('/api/comments')).toEqual([])
+  })
+
+  it('refuses a body that is not JSON', async () => {
+    const res = await api('/api/comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: 'not json',
+    })
+    expect(res.status).toBe(400)
+  })
+
   it('404s on unknown comment ids', async () => {
     expect((await api('/api/comments/missing', { method: 'DELETE' })).status).toBe(404)
     expect(
