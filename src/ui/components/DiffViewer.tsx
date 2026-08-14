@@ -1,15 +1,16 @@
 import { memo, useCallback, useMemo, useState } from 'react'
-import type { FileDiffMetadata, DiffLineAnnotation, SelectedLineRange } from '@pierre/diffs'
+import type { DiffLineAnnotation, SelectedLineRange } from '@pierre/diffs'
 import type { ReviewComment } from '../../types'
 import type { BinaryFileInfo } from '../hooks/useDiff'
 import type { NewComment } from '../hooks/useComments'
 import type { CommentTarget } from '../utils'
 import type { CommitRange } from '../hooks/useCommits'
+import type { DiffEntry } from '../fileTree'
 import { FileDiffCard } from './FileDiffCard'
 import { BinaryFileDiff } from './BinaryFileDiff'
 
 interface DiffViewerProps {
-  files: FileDiffMetadata[]
+  entries: DiffEntry[]
   diffStyle: 'split' | 'unified'
   tabSizeMap: Record<string, number>
   defaultTabSize: number
@@ -37,7 +38,7 @@ interface ActiveComment {
 }
 
 export const DiffViewer = memo(function DiffViewer({
-  files,
+  entries,
   diffStyle,
   tabSizeMap,
   defaultTabSize,
@@ -68,10 +69,10 @@ export const DiffViewer = memo(function DiffViewer({
     setActive(target ? { filePath, selection: null, target } : null)
   }, [])
 
-  const sortedFiles = useMemo(() => {
-    return [...files].sort((a, b) => {
-      const partsA = a.name.split('/')
-      const partsB = b.name.split('/')
+  const sortedEntries = useMemo(() => {
+    return [...entries].sort((a, b) => {
+      const partsA = a.file.name.split('/')
+      const partsB = b.file.name.split('/')
       const len = Math.min(partsA.length, partsB.length)
       for (let i = 0; i < len; i++) {
         const aIsDir = i < partsA.length - 1
@@ -82,9 +83,9 @@ export const DiffViewer = memo(function DiffViewer({
       }
       return partsA.length - partsB.length
     })
-  }, [files])
+  }, [entries])
 
-  if (sortedFiles.length === 0) {
+  if (sortedEntries.length === 0) {
     return (
       <div className="empty-state">
         <p>No changes found.</p>
@@ -94,13 +95,14 @@ export const DiffViewer = memo(function DiffViewer({
 
   return (
     <div className="diff-viewer">
-      {sortedFiles.map((file, index) => {
+      {sortedEntries.map(({ file, domId }) => {
         const filePath = file.name
         const binaryInfo = binaryFiles.get(filePath)
         if (binaryInfo) {
           return (
             <BinaryFileDiff
-              key={`${filePath}-${index}`}
+              key={domId}
+              id={domId}
               filePath={filePath}
               info={binaryInfo}
               viewed={viewedFiles.has(filePath)}
@@ -116,8 +118,8 @@ export const DiffViewer = memo(function DiffViewer({
             // @pierre/diffs <FileDiff> under the Virtualizer does not re-process
             // an in-place fileDiff change, so without a remount the upgraded
             // diff never renders and hunk-context expansion controls never appear.
-            key={`${filePath}-${index}-${file.isPartial ? 'p' : 'f'}`}
-            id={`file-${filePath}`}
+            key={`${domId}-${file.isPartial ? 'p' : 'f'}`}
+            id={domId}
             fileDiff={file}
             filePath={filePath}
             annotations={fileAnnotationsMap.get(filePath) ?? emptyAnnotations}

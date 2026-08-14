@@ -15,60 +15,17 @@ import {
   PanelLeftOpen,
 } from 'lucide-react'
 import type { FileDiffMetadata } from '@pierre/diffs'
+import { buildTree, type DiffEntry, type TreeNode } from '../fileTree'
 
 interface FileTreeProps {
-  files: FileDiffMetadata[]
-  activeFile: string | null
+  entries: DiffEntry[]
+  activeCard: string | null
   commentCounts: Record<string, number>
   viewedFiles: Set<string>
   untrackedFiles: Set<string>
-  onFileClick: (filePath: string) => void
+  onFileClick: (domId: string) => void
   collapsed?: boolean
   onToggleCollapse?: () => void
-}
-
-interface TreeNode {
-  name: string
-  path: string
-  isDir: boolean
-  children: TreeNode[]
-  file?: FileDiffMetadata
-}
-
-function buildTree(files: FileDiffMetadata[]): TreeNode[] {
-  const root: TreeNode[] = []
-
-  for (const file of files) {
-    const parts = file.name.split('/')
-    let current = root
-
-    for (let i = 0; i < parts.length; i++) {
-      const name = parts[i]
-      const path = parts.slice(0, i + 1).join('/')
-      const isDir = i < parts.length - 1
-
-      let existing = current.find((n) => n.name === name && n.isDir === isDir)
-      if (!existing) {
-        existing = { name, path, isDir, children: [] }
-        if (!isDir) existing.file = file
-        current.push(existing)
-      }
-      current = existing.children
-    }
-  }
-
-  function sortNodes(nodes: TreeNode[]) {
-    nodes.sort((a, b) => {
-      if (a.isDir !== b.isDir) return a.isDir ? -1 : 1
-      return a.name.localeCompare(b.name)
-    })
-    for (const node of nodes) {
-      if (node.isDir) sortNodes(node.children)
-    }
-  }
-  sortNodes(root)
-
-  return root
 }
 
 function inferChangeType(file: FileDiffMetadata, untrackedFiles: Set<string>): string {
@@ -105,7 +62,7 @@ function getFileIcon(file: FileDiffMetadata | undefined, viewed: boolean, untrac
 
 function TreeDir({
   node,
-  activeFile,
+  activeCard,
   commentCounts,
   viewedFiles,
   untrackedFiles,
@@ -114,11 +71,11 @@ function TreeDir({
   defaultExpanded,
 }: {
   node: TreeNode
-  activeFile: string | null
+  activeCard: string | null
   commentCounts: Record<string, number>
   viewedFiles: Set<string>
   untrackedFiles: Set<string>
-  onFileClick: (filePath: string) => void
+  onFileClick: (domId: string) => void
   depth: number
   defaultExpanded: boolean
 }) {
@@ -147,9 +104,9 @@ function TreeDir({
           {node.children.map((child) =>
             child.isDir ? (
               <TreeDir
-                key={child.path}
+                key={child.domId ?? child.path}
                 node={child}
-                activeFile={activeFile}
+                activeCard={activeCard}
                 commentCounts={commentCounts}
                 viewedFiles={viewedFiles}
                 untrackedFiles={untrackedFiles}
@@ -159,9 +116,9 @@ function TreeDir({
               />
             ) : (
               <TreeFile
-                key={child.path}
+                key={child.domId ?? child.path}
                 node={child}
-                activeFile={activeFile}
+                activeCard={activeCard}
                 commentCount={commentCounts[child.file?.name ?? ''] ?? 0}
                 viewed={viewedFiles.has(child.file?.name ?? '')}
                 untrackedFiles={untrackedFiles}
@@ -178,7 +135,7 @@ function TreeDir({
 
 function TreeFile({
   node,
-  activeFile,
+  activeCard,
   commentCount,
   viewed,
   untrackedFiles,
@@ -186,22 +143,25 @@ function TreeFile({
   depth,
 }: {
   node: TreeNode
-  activeFile: string | null
+  activeCard: string | null
   commentCount: number
   viewed: boolean
   untrackedFiles: Set<string>
-  onFileClick: (filePath: string) => void
+  onFileClick: (domId: string) => void
   depth: number
 }) {
   const filePath = node.file?.name ?? node.path
-  const isActive = activeFile === filePath
+  const domId = node.domId ?? `file-${filePath}`
+  // Two entries for one path are two different cards, so the active one is
+  // identified by its card, not by its path.
+  const isActive = activeCard === domId
 
   return (
     <li>
       <div
         className={`ft-row ft-file ${isActive ? 'ft-file-active' : ''} ${viewed ? 'ft-file-viewed' : ''}`}
         style={{ paddingLeft: `${12 + depth * 16 + 20}px` }}
-        onClick={() => onFileClick(filePath)}
+        onClick={() => onFileClick(domId)}
         title={filePath}
       >
         {getFileIcon(node.file, viewed, untrackedFiles)}
@@ -217,16 +177,16 @@ function TreeFile({
   )
 }
 
-export function FileTree({ files, activeFile, commentCounts, viewedFiles, untrackedFiles, onFileClick, collapsed, onToggleCollapse }: FileTreeProps) {
+export function FileTree({ entries, activeCard, commentCounts, viewedFiles, untrackedFiles, onFileClick, collapsed, onToggleCollapse }: FileTreeProps) {
   const [filter, setFilter] = useState('')
 
-  const filteredFiles = useMemo(() => {
-    if (!filter) return files
+  const filteredEntries = useMemo(() => {
+    if (!filter) return entries
     const lower = filter.toLowerCase()
-    return files.filter((f) => f.name.toLowerCase().includes(lower))
-  }, [files, filter])
+    return entries.filter((e) => e.file.name.toLowerCase().includes(lower))
+  }, [entries, filter])
 
-  const tree = useMemo(() => buildTree(filteredFiles), [filteredFiles])
+  const tree = useMemo(() => buildTree(filteredEntries), [filteredEntries])
 
   if (collapsed) {
     return (
@@ -275,9 +235,9 @@ export function FileTree({ files, activeFile, commentCounts, viewedFiles, untrac
         {tree.map((node) =>
           node.isDir ? (
             <TreeDir
-              key={node.path}
+              key={node.domId ?? node.path}
               node={node}
-              activeFile={activeFile}
+              activeCard={activeCard}
               commentCounts={commentCounts}
               viewedFiles={viewedFiles}
               untrackedFiles={untrackedFiles}
@@ -287,9 +247,9 @@ export function FileTree({ files, activeFile, commentCounts, viewedFiles, untrac
             />
           ) : (
             <TreeFile
-              key={node.path}
+              key={node.domId ?? node.path}
               node={node}
-              activeFile={activeFile}
+              activeCard={activeCard}
               commentCount={commentCounts[node.file?.name ?? ''] ?? 0}
               viewed={viewedFiles.has(node.file?.name ?? '')}
               untrackedFiles={untrackedFiles}
