@@ -249,6 +249,7 @@ export function App() {
               softWrap={settings.softWrap}
               viewedFiles={viewedFiles}
               binaryFiles={binaryFileMap}
+              range={range}
               onViewedChange={handleViewedChange}
               fileAnnotationsMap={fileAnnotationsMap}
               onAddComment={addComment}

@@ -1,4 +1,5 @@
 import type { BinaryFileInfo } from '../hooks/useDiff'
+import { rangeParams, type CommitRange } from '../hooks/useCommits'
 
 const IMAGE_EXTENSIONS = new Set([
   '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.ico', '.avif',
@@ -13,10 +14,11 @@ interface BinaryFileDiffProps {
   filePath: string
   info: BinaryFileInfo
   viewed: boolean
+  range: CommitRange
   onViewedChange: (filePath: string, viewed: boolean) => void
 }
 
-export function BinaryFileDiff({ filePath, info, viewed, onViewedChange }: BinaryFileDiffProps) {
+export function BinaryFileDiff({ filePath, info, viewed, range, onViewedChange }: BinaryFileDiffProps) {
   const image = isImage(filePath)
 
   return (
@@ -35,7 +37,7 @@ export function BinaryFileDiff({ filePath, info, viewed, onViewedChange }: Binar
       {!viewed && (
         <div className="binary-diff-body">
           {image ? (
-            <ImagePreview filePath={filePath} changeType={info.type} />
+            <ImagePreview filePath={filePath} changeType={info.type} range={range} />
           ) : (
             <div className="binary-diff-message">
               Binary file {info.type === 'added' ? 'added' : info.type === 'untracked' ? 'untracked' : info.type === 'deleted' ? 'deleted' : 'changed'}
@@ -47,9 +49,21 @@ export function BinaryFileDiff({ filePath, info, viewed, onViewedChange }: Binar
   )
 }
 
-function ImagePreview({ filePath, changeType }: { filePath: string; changeType: BinaryFileInfo['type'] }) {
-  const oldSrc = `/api/file-content?path=${encodeURIComponent(filePath)}&version=old`
-  const newSrc = `/api/file-content?path=${encodeURIComponent(filePath)}&version=new`
+function ImagePreview({
+  filePath,
+  changeType,
+  range,
+}: {
+  filePath: string
+  changeType: BinaryFileInfo['type']
+  range: CommitRange
+}) {
+  // The previewed versions have to come from the same range as the diff, so the
+  // selected range travels with the request.
+  const src = (version: 'old' | 'new') =>
+    `/api/file-content?${new URLSearchParams({ path: filePath, version, ...rangeParams(range) })}`
+  const oldSrc = src('old')
+  const newSrc = src('new')
 
   if (changeType === 'added' || changeType === 'untracked') {
     return (

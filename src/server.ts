@@ -166,11 +166,19 @@ export function createApp(clientDir: string, customDiffArgs?: string[], commentS
 
   app.get('/api/file-content', (c) => {
     const path = c.req.query('path')
-    const version = c.req.query('version') as 'old' | 'new'
-    if (!path || !version) {
+    const version = c.req.query('version')
+    if (!path || (version !== 'old' && version !== 'new')) {
       return c.json({ error: 'Missing path or version' }, 400)
     }
-    const content = getFileContent(path, version)
+    const range = parseRangeQuery(c.req.query('base'), c.req.query('head'))
+    if (range === 'invalid') {
+      return c.json({ error: 'Unknown commit in requested range' }, 400)
+    }
+    // Both sides have to come from the same range the diff was built from: the
+    // old side is the range's base, the new side its head — or the working tree
+    // when the range ends there, which is also the default (HEAD..worktree).
+    const revision = version === 'old' ? (range?.base ?? 'HEAD') : range?.head
+    const content = getFileContent(path, revision)
     if (!content) {
       return c.json({ error: 'File not found' }, 404)
     }

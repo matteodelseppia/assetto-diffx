@@ -113,6 +113,39 @@ describe('GET /api/diff with a selected range', () => {
   })
 })
 
+describe('GET /api/file-content with a selected range', () => {
+  it('serves both sides of the selected range, not HEAD and the worktree', async () => {
+    const [, second, first] = commits
+    const query = `path=file.ts&base=${first.sha}&head=${second.sha}`
+
+    const oldSide = await api(`/api/file-content?${query}&version=old`)
+    expect(oldSide.status).toBe(200)
+    expect(await oldSide.text()).toBe('line one\n')
+
+    const newSide = await api(`/api/file-content?${query}&version=new`)
+    expect(newSide.status).toBe(200)
+    expect(await newSide.text()).toBe('line one\nline two\nline three\n')
+  })
+
+  it('reads the new side from the working tree when the range ends there', async () => {
+    const first = commits[2].sha
+    const oldSide = await api(`/api/file-content?path=file.ts&base=${first}&version=old`)
+    expect(await oldSide.text()).toBe('line one\n')
+
+    const newSide = await api(`/api/file-content?path=file.ts&base=${first}&version=new`)
+    expect(await newSide.text()).toBe('line one\nline TWO\nline three\n')
+  })
+
+  it('rejects a range whose ends are not commits of this repository', async () => {
+    expect((await api('/api/file-content?path=file.ts&version=old&base=HEAD~2')).status).toBe(400)
+    expect((await api(`/api/file-content?path=file.ts&version=old&head=${commits[0].sha}`)).status).toBe(400)
+  })
+
+  it('rejects an unknown version', async () => {
+    expect((await api('/api/file-content?path=file.ts&version=staged')).status).toBe(400)
+  })
+})
+
 describe('POST /api/comments on a selected range', () => {
   it('accepts an added line that still exists in the working tree', async () => {
     const res = await postComment({
