@@ -27,15 +27,32 @@ assetto-diffx [options] [-- <git-diff-args>]
 
 Options:
   -p, --port <port>   Server port (default: 3433)
+  --host <host>       Bind address (default: 127.0.0.1)
   --no-open           Don't auto-open browser
 
 Examples:
   assetto-diffx                          # Review working tree changes
   assetto-diffx -p 8080                  # Use custom port
+  assetto-diffx --host 0.0.0.0           # Let the LAN review too
   assetto-diffx -- HEAD~3                # Diff against 3 commits ago
   assetto-diffx -- main..HEAD            # Diff between branches
   assetto-diffx -- --cached -- src/      # Staged changes in src/
 ```
+
+### Reviewing from another machine
+
+By default the server binds to `127.0.0.1` and is reachable only from your own
+machine. `--host 0.0.0.0` opens it to the local network, and because that also
+opens it to everyone else on that network, the URL then carries a one-off access
+token:
+
+```
+assetto-diffx server running at http://0.0.0.0:3433/?token=<token>
+```
+
+Every request — the page, its assets and the API — needs that token, so send
+reviewers the whole link. It is regenerated on each start and lives only in
+memory.
 
 ## Features
 
