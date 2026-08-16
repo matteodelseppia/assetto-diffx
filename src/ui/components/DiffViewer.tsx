@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import type { DiffLineAnnotation, SelectedLineRange } from '@pierre/diffs'
 import type { ReviewComment } from '../../types'
 import type { BinaryFileInfo } from '../hooks/useDiff'
@@ -23,6 +23,8 @@ interface DiffViewerProps {
   onAddComment: (comment: NewComment) => void
   onDeleteComment: (id: string) => void
   onReplyComment: (id: string, body: string) => void
+  /** Whether a selection or comment form is active anywhere in the diff. */
+  onInteractingChange?: (interacting: boolean) => void
 }
 
 const emptyAnnotations: DiffLineAnnotation<ReviewComment>[] = []
@@ -52,8 +54,13 @@ export const DiffViewer = memo(function DiffViewer({
   onAddComment,
   onDeleteComment,
   onReplyComment,
+  onInteractingChange,
 }: DiffViewerProps) {
   const [active, setActive] = useState<ActiveComment | null>(null)
+
+  useEffect(() => {
+    onInteractingChange?.(active !== null)
+  }, [active, onInteractingChange])
 
   const handleSelectionStart = useCallback((filePath: string) => {
     setActive({ filePath, selection: null, target: null })
