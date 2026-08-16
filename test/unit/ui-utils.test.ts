@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { timeAgo, truncate, fileName, lineRange, lineLabel, formatComments, commentTargetFromRange } from '../../src/ui/utils.js'
+import { timeAgo, truncate, fileName, lineRange, lineLabel, formatComments, commentTargetFromRange, isCommentAnchored } from '../../src/ui/utils.js'
 import type { ReviewComment } from '../../src/types.js'
+import type { FileDiffMetadata } from '@pierre/diffs'
 
 function makeComment(overrides: Partial<ReviewComment> = {}): ReviewComment {
   return {
@@ -197,5 +198,60 @@ describe('lineLabel', () => {
 
   it('names a range by its ends', () => {
     expect(lineLabel(12, 16)).toBe('Lines 12–16')
+  })
+})
+
+function makeFile(overrides: Partial<FileDiffMetadata> = {}): FileDiffMetadata {
+  return {
+    name: 'src/index.ts',
+    type: 'change',
+    hunks: [],
+    splitLineCount: 0,
+    unifiedLineCount: 0,
+    isPartial: true,
+    deletionLines: [],
+    additionLines: [],
+    ...overrides,
+  }
+}
+
+describe('isCommentAnchored', () => {
+  it('is anchored when its file and content still appear in the current diff', () => {
+    const comment = makeComment({ filePath: 'src/index.ts', side: 'additions', lineContents: ['const x = 1'] })
+    const files = [makeFile({ name: 'src/index.ts', additionLines: ['const x = 1', 'const y = 2'] })]
+    expect(isCommentAnchored(comment, files)).toBe(true)
+  })
+
+  it('is orphaned once its commented code is gone from the current diff (refactored away)', () => {
+    const comment = makeComment({ filePath: 'src/index.ts', side: 'additions', lineContents: ['const x = 1'] })
+    const files = [makeFile({ name: 'src/index.ts', additionLines: ['const renamed = 1'] })]
+    expect(isCommentAnchored(comment, files)).toBe(false)
+  })
+
+  it('is orphaned when the file it was on no longer appears in the diff at all', () => {
+    const comment = makeComment({ filePath: 'src/index.ts', side: 'additions', lineContents: ['const x = 1'] })
+    expect(isCommentAnchored(comment, [])).toBe(false)
+  })
+
+  it('checks deletions against deletionLines and additions against additionLines', () => {
+    const comment = makeComment({ filePath: 'src/index.ts', side: 'deletions', lineContents: ['const old = 1'] })
+    const files = [makeFile({ name: 'src/index.ts', deletionLines: ['const old = 1'], additionLines: [] })]
+    expect(isCommentAnchored(comment, files)).toBe(true)
+  })
+
+  it('requires every line of a multi-line comment to still be present', () => {
+    const comment = makeComment({
+      filePath: 'src/index.ts',
+      side: 'additions',
+      lineContents: ['const x = 1', 'const y = 2'],
+    })
+    const files = [makeFile({ name: 'src/index.ts', additionLines: ['const x = 1'] })]
+    expect(isCommentAnchored(comment, files)).toBe(false)
+  })
+
+  it('ignores surrounding whitespace, matching the server-side worktree check', () => {
+    const comment = makeComment({ filePath: 'src/index.ts', side: 'additions', lineContents: ['  const x = 1  '] })
+    const files = [makeFile({ name: 'src/index.ts', additionLines: ['const x = 1'] })]
+    expect(isCommentAnchored(comment, files)).toBe(true)
   })
 })

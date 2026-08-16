@@ -1,4 +1,4 @@
-import type { AnnotationSide, SelectedLineRange } from '@pierre/diffs'
+import type { AnnotationSide, FileDiffMetadata, SelectedLineRange } from '@pierre/diffs'
 import type { ReviewComment } from '../types'
 
 /** The span of lines a comment being written covers. */
@@ -96,6 +96,26 @@ export function truncate(text: string, maxLen: number): string {
   const firstLine = text.split('\n')[0]
   if (firstLine.length <= maxLen) return firstLine
   return firstLine.slice(0, maxLen) + '…'
+}
+
+/**
+ * Whether a comment's code is still present in the current diff, so its
+ * inline bubble has somewhere to render. A refactor can shift or delete the
+ * lines a comment was anchored to; when that happens `lineNumber` keeps
+ * pointing at whatever now occupies that spot, so anchoring is re-checked by
+ * content rather than trusted at the stored line number. Mirrors the
+ * whitespace-insensitive membership check the server runs at creation time
+ * (`areLinesPresentInWorktree`), so a comment that could be posted can also
+ * still be found later.
+ */
+export function isCommentAnchored(comment: ReviewComment, files: FileDiffMetadata[]): boolean {
+  const file = files.find((f) => f.name === comment.filePath)
+  if (!file) return false
+  const lines = comment.side === 'additions' ? file.additionLines : file.deletionLines
+  const needles = comment.lineContents.map((line) => line.trim()).filter((line) => line !== '')
+  if (needles.length === 0) return true
+  const present = new Set(lines.map((line) => line.trim()))
+  return needles.every((needle) => present.has(needle))
 }
 
 export function fileName(filePath: string): string {

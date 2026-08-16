@@ -3,12 +3,15 @@ import {
   CheckCircle2,
   Reply,
   Circle,
+  FileWarning,
 } from 'lucide-react'
+import type { FileDiffMetadata } from '@pierre/diffs'
 import type { ReviewComment } from '../../types'
-import { timeAgo, truncate, fileName, lineRange } from '../utils'
+import { timeAgo, truncate, fileName, lineRange, isCommentAnchored } from '../utils'
 
 interface CommentTrackerProps {
   comments: ReviewComment[]
+  files: FileDiffMetadata[]
 }
 
 type CommentStatus = 'open' | 'replied' | 'resolved'
@@ -63,7 +66,7 @@ function StatusBadge({ status }: { status: CommentStatus }) {
   }
 }
 
-export function CommentTracker({ comments }: CommentTrackerProps) {
+export function CommentTracker({ comments, files }: CommentTrackerProps) {
   if (comments.length === 0) return null
 
   const sorted = [...comments].sort((a, b) => b.createdAt - a.createdAt)
@@ -86,6 +89,12 @@ export function CommentTracker({ comments }: CommentTrackerProps) {
       <ul className="ct-list">
         {sorted.map((comment) => {
           const status = getCommentStatus(comment)
+          // A refactor can delete or rewrite the code a comment hangs from,
+          // leaving nothing for its inline bubble to anchor to. When that
+          // happens the comment still needs to be reviewable, so its original
+          // snippet is shown right here instead of relying on the diff to
+          // still contain it.
+          const anchored = isCommentAnchored(comment, files)
           return (
             <li
               key={comment.id}
@@ -102,12 +111,22 @@ export function CommentTracker({ comments }: CommentTrackerProps) {
               >
                 <div className="ct-item-header">
                   <StatusBadge status={status} />
+                  {!anchored && (
+                    <span className="ct-item-orphan" title="This code has changed since the comment was posted — showing the original snippet">
+                      <FileWarning size={12} />
+                    </span>
+                  )}
                   <span className="ct-item-file" title={comment.filePath}>
                     {fileName(comment.filePath)}:{lineRange(comment)}
                   </span>
                   <span className="ct-item-time">{timeAgo(comment.createdAt)}</span>
                 </div>
                 <div className="ct-item-body">{truncate(comment.body, 80)}</div>
+                {!anchored && (
+                  <pre className="ct-item-snippet">
+                    {comment.lineContents.join('\n')}
+                  </pre>
+                )}
               </a>
             </li>
           )
