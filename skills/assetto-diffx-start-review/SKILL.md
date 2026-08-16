@@ -57,9 +57,8 @@ Use `<port>` from the server's startup output, and `since=0` for the first call.
       "id": "uuid",
       "filePath": "src/utils/parser.ts",
       "side": "additions",
-      "startLineNumber": 42,
       "lineNumber": 42,
-      "lineContents": ["const x = tokenize(input)"],
+      "lineContent": "const x = tokenize(input)",
       "body": "Rename x to parsedToken for clarity",
       "status": "open",
       "createdAt": 1234567890,
@@ -81,7 +80,7 @@ Handle **every** comment in the batch before polling again. For each one, read t
 
 #### Change requests (e.g., "Rename x to parsedToken", "Extract this into a helper")
 
-Read the file at `filePath`, find the code using `lineContents` as context, apply the change, then reply and resolve:
+Read the file at `filePath`, find the code using `lineContent` as context, apply the change, then reply and resolve:
 
 ```bash
 curl -s -X POST http://localhost:<port>/api/comments/<id>/replies \
@@ -107,7 +106,7 @@ Always reply to a thread you have handled, even if only to say you need clarific
 
 Then go back to step 3 with the new `version`. Keep looping until the user says the review is over or the server stops (`curl` fails to connect).
 
-The `side` field tells you whether the comment is on an added line (`additions`) or a deleted line (`deletions`). A comment can cover a range: `startLineNumber` is its first line, `lineNumber` its last, and `lineContents` holds every line in between. They are equal for a single-line comment.
+The `side` field tells you whether the comment is on an added line (`additions`) or a deleted line (`deletions`). `lineNumber` is the commented line, and `lineContent` is its content.
 
 A reply posted this way is recorded as coming from the agent; the reviewer can answer it from the page, and the thread can go back and forth any number of times.
 

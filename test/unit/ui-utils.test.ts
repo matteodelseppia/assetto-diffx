@@ -18,9 +18,8 @@ function makeComment(overrides: Partial<ReviewComment> = {}): ReviewComment {
     id: 'c1',
     filePath: 'src/index.ts',
     side: 'additions',
-    startLineNumber: 12,
     lineNumber: 12,
-    lineContents: ['const x = 1'],
+    lineContent: 'const x = 1',
     body: 'nit: name this better',
     status: 'open',
     createdAt: 1_700_000_000_000,
@@ -90,12 +89,8 @@ describe('fileName', () => {
 })
 
 describe('lineRange', () => {
-  it('reports a single line as one number', () => {
+  it('reports the comment line as one number', () => {
     expect(lineRange(makeComment())).toBe('12')
-  })
-
-  it('reports a range as its two ends', () => {
-    expect(lineRange(makeComment({ startLineNumber: 12, lineNumber: 16 }))).toBe('12-16')
   })
 })
 
@@ -133,18 +128,6 @@ describe('formatComments', () => {
     expect(text.indexOf('renamed it')).toBeLessThan(text.indexOf('the other one too'))
   })
 
-  it('quotes every line of a range comment', () => {
-    const text = formatComments([
-      makeComment({
-        startLineNumber: 12,
-        lineNumber: 14,
-        lineContents: ['const x = 1', 'const y = 2', 'const z = 3'],
-      }),
-    ])
-    expect(text).toContain('<comment lines="12-14">')
-    expect(text).toContain('<code>+ const x = 1\n+ const y = 2\n+ const z = 3</code>')
-  })
-
   it('marks deleted lines with a minus', () => {
     const text = formatComments([makeComment({ side: 'deletions' })])
     expect(text).toContain('<code>- const x = 1</code>')
@@ -165,49 +148,34 @@ describe('commentTargetFromRange', () => {
   it('keeps a single-line selection as one line', () => {
     expect(commentTargetFromRange({ start: 7, end: 7, side: 'additions' })).toEqual({
       side: 'additions',
-      startLine: 7,
-      endLine: 7,
+      line: 7,
     })
   })
 
-  it('keeps a downward drag in order', () => {
+  it('anchors to the line a drag ended on', () => {
     expect(commentTargetFromRange({ start: 4, end: 9, side: 'additions' })).toEqual({
       side: 'additions',
-      startLine: 4,
-      endLine: 9,
-    })
-  })
-
-  it('orders the ends of an upward drag', () => {
-    expect(commentTargetFromRange({ start: 9, end: 4, side: 'deletions' })).toEqual({
-      side: 'deletions',
-      startLine: 4,
-      endLine: 9,
+      line: 9,
     })
   })
 
   it('defaults to the additions side when the range carries none', () => {
     expect(commentTargetFromRange({ start: 2, end: 3 })).toEqual({
       side: 'additions',
-      startLine: 2,
-      endLine: 3,
+      line: 3,
     })
   })
 
-  it('collapses a range dragged across both sides of a split diff', () => {
+  it('anchors to the side and line a drag ended on across both sides of a split diff', () => {
     expect(
       commentTargetFromRange({ start: 4, end: 9, side: 'deletions', endSide: 'additions' }),
-    ).toEqual({ side: 'additions', startLine: 9, endLine: 9 })
+    ).toEqual({ side: 'additions', line: 9 })
   })
 })
 
 describe('lineLabel', () => {
   it('names a single line', () => {
-    expect(lineLabel(12, 12)).toBe('Line 12')
-  })
-
-  it('names a range by its ends', () => {
-    expect(lineLabel(12, 16)).toBe('Lines 12–16')
+    expect(lineLabel(12)).toBe('Line 12')
   })
 })
 
@@ -250,40 +218,30 @@ function makeFile(overrides: Partial<FileDiffMetadata> = {}): FileDiffMetadata {
 
 describe('isCommentAnchored', () => {
   it('is anchored when its file and content still appear in the current diff', () => {
-    const comment = makeComment({ filePath: 'src/index.ts', side: 'additions', lineContents: ['const x = 1'] })
+    const comment = makeComment({ filePath: 'src/index.ts', side: 'additions', lineContent: 'const x = 1' })
     const files = [makeFile({ name: 'src/index.ts', additionLines: ['const x = 1', 'const y = 2'] })]
     expect(isCommentAnchored(comment, files)).toBe(true)
   })
 
   it('is orphaned once its commented code is gone from the current diff (refactored away)', () => {
-    const comment = makeComment({ filePath: 'src/index.ts', side: 'additions', lineContents: ['const x = 1'] })
+    const comment = makeComment({ filePath: 'src/index.ts', side: 'additions', lineContent: 'const x = 1' })
     const files = [makeFile({ name: 'src/index.ts', additionLines: ['const renamed = 1'] })]
     expect(isCommentAnchored(comment, files)).toBe(false)
   })
 
   it('is orphaned when the file it was on no longer appears in the diff at all', () => {
-    const comment = makeComment({ filePath: 'src/index.ts', side: 'additions', lineContents: ['const x = 1'] })
+    const comment = makeComment({ filePath: 'src/index.ts', side: 'additions', lineContent: 'const x = 1' })
     expect(isCommentAnchored(comment, [])).toBe(false)
   })
 
   it('checks deletions against deletionLines and additions against additionLines', () => {
-    const comment = makeComment({ filePath: 'src/index.ts', side: 'deletions', lineContents: ['const old = 1'] })
+    const comment = makeComment({ filePath: 'src/index.ts', side: 'deletions', lineContent: 'const old = 1' })
     const files = [makeFile({ name: 'src/index.ts', deletionLines: ['const old = 1'], additionLines: [] })]
     expect(isCommentAnchored(comment, files)).toBe(true)
   })
 
-  it('requires every line of a multi-line comment to still be present', () => {
-    const comment = makeComment({
-      filePath: 'src/index.ts',
-      side: 'additions',
-      lineContents: ['const x = 1', 'const y = 2'],
-    })
-    const files = [makeFile({ name: 'src/index.ts', additionLines: ['const x = 1'] })]
-    expect(isCommentAnchored(comment, files)).toBe(false)
-  })
-
   it('ignores surrounding whitespace, matching the server-side worktree check', () => {
-    const comment = makeComment({ filePath: 'src/index.ts', side: 'additions', lineContents: ['  const x = 1  '] })
+    const comment = makeComment({ filePath: 'src/index.ts', side: 'additions', lineContent: '  const x = 1  ' })
     const files = [makeFile({ name: 'src/index.ts', additionLines: ['const x = 1'] })]
     expect(isCommentAnchored(comment, files)).toBe(true)
   })

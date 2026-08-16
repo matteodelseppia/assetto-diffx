@@ -2,13 +2,12 @@ import { useState, useRef, useEffect } from 'react'
 import { lineLabel } from '../utils'
 
 interface CommentFormProps {
-  startLine: number
-  endLine: number
+  line: number
   onSubmit: (body: string) => void
   onCancel: () => void
 }
 
-export function CommentForm({ startLine, endLine, onSubmit, onCancel }: CommentFormProps) {
+export function CommentForm({ line, onSubmit, onCancel }: CommentFormProps) {
   const [body, setBody] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -35,7 +34,7 @@ export function CommentForm({ startLine, endLine, onSubmit, onCancel }: CommentF
 
   return (
     <div className="comment-form">
-      <div className="comment-form-target">{lineLabel(startLine, endLine)}</div>
+      <div className="comment-form-target">{lineLabel(line)}</div>
       <textarea
         ref={textareaRef}
         value={body}

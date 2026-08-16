@@ -122,11 +122,7 @@ export function CommentTracker({ comments, files }: CommentTrackerProps) {
                   <span className="ct-item-time">{timeAgo(comment.createdAt)}</span>
                 </div>
                 <div className="ct-item-body">{truncate(comment.body, 80)}</div>
-                {!anchored && (
-                  <pre className="ct-item-snippet">
-                    {comment.lineContents.join('\n')}
-                  </pre>
-                )}
+                {!anchored && <pre className="ct-item-snippet">{comment.lineContent}</pre>}
               </a>
             </li>
           )

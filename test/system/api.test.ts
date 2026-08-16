@@ -109,9 +109,8 @@ describe('/api/comments', () => {
       body: JSON.stringify({
         filePath: 'src/modified.ts',
         side: 'additions',
-        startLineNumber: 1,
         lineNumber: 1,
-        lineContents: ['export const value = 42'],
+        lineContent: 'export const value = 42',
         body: 'why 42?',
       }),
     })
@@ -185,7 +184,7 @@ describe('/api/comments', () => {
         filePath: 'src/modified.ts',
         side: 'additions',
         lineNumber: 1,
-        lineContents: ['export const value = 42'],
+        lineContent: 'export const value = 42',
         body: 'why 42?',
       }),
     })
