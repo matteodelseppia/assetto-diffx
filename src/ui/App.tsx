@@ -174,7 +174,7 @@ export function App() {
         collapsed={sidebar.collapsed}
         onToggleCollapse={handleToggleCollapse}
       />
-      {!sidebar.collapsed && <CommentTracker comments={comments} />}
+      {!sidebar.collapsed && <CommentTracker comments={comments} files={files} />}
     </div>
   )
 

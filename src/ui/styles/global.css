@@ -1192,3 +1192,29 @@ body {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+.ct-item-orphan {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    color: #bf8700;
+}
+
+@media (prefers-color-scheme: dark) {
+    .ct-item-orphan {
+        color: #d29922;
+    }
+}
+
+.ct-item-snippet {
+    margin: 6px 0 0;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-family:
+        ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    color: var(--text-secondary);
+    background: var(--bg-secondary, rgba(128, 128, 128, 0.08));
+    border-radius: 4px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
