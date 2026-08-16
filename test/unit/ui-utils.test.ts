@@ -1,5 +1,15 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { timeAgo, truncate, fileName, lineRange, lineLabel, formatComments, commentTargetFromRange, isCommentAnchored } from '../../src/ui/utils.js'
+import {
+  timeAgo,
+  truncate,
+  fileName,
+  lineRange,
+  lineLabel,
+  formatComments,
+  commentTargetFromRange,
+  isCommentAnchored,
+  settledFullDiffs,
+} from '../../src/ui/utils.js'
 import type { ReviewComment } from '../../src/types.js'
 import type { FileDiffMetadata } from '@pierre/diffs'
 
@@ -198,6 +208,29 @@ describe('lineLabel', () => {
 
   it('names a range by its ends', () => {
     expect(lineLabel(12, 16)).toBe('Lines 12–16')
+  })
+})
+
+describe('settledFullDiffs', () => {
+  it('adopts the latest map once nothing is being interacted with', () => {
+    const committed = new Map([['a', 1]])
+    const latest = new Map([['a', 1], ['b', 2]])
+    expect(settledFullDiffs(committed, latest, false)).toBe(latest)
+  })
+
+  it('holds the previously committed map while a selection or comment form is active', () => {
+    const committed = new Map([['a', 1]])
+    const latest = new Map([['a', 1], ['b', 2]])
+    expect(settledFullDiffs(committed, latest, true)).toBe(committed)
+  })
+
+  it('picks up everything that was held as soon as interacting turns off', () => {
+    const committed = new Map([['a', 1]])
+    const latest = new Map([['a', 1], ['b', 2], ['c', 3]])
+    // Simulates the caller's effect: held while dragging, then re-evaluated
+    // once the drag ends and `interacting` flips to false.
+    const heldDuringDrag = settledFullDiffs(committed, latest, true)
+    expect(settledFullDiffs(heldDuringDrag, latest, false)).toBe(latest)
   })
 })
 

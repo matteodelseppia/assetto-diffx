@@ -11,6 +11,7 @@ import { useSettings } from './hooks/useSettings'
 import { useViewed } from './hooks/useViewed'
 import { useFullDiffs } from './hooks/useFullDiffs'
 import { buildEntryIds, entryKey, type DiffEntry } from './fileTree'
+import { settledFullDiffs } from './utils'
 import { Toolbar } from './components/Toolbar'
 import { DiffViewer } from './components/DiffViewer'
 import { FileTree } from './components/FileTree'
@@ -93,6 +94,17 @@ export function App() {
   }, [patch, binaryFiles])
 
   const fullFiles = useFullDiffs(patch, files, { staged: settings.staged, untracked: settings.untracked }, range)
+  // A file upgrading from partial to full changes its FileDiffCard's key,
+  // which forces @pierre/diffs to remount that file's <FileDiff> — destroying
+  // any gutter-drag selection or open comment form it (or, under the shared
+  // Virtualizer, a neighboring card) was mid-interaction with. Upgrades are
+  // held back while the reviewer is interacting anywhere in the diff, and
+  // applied the moment they finish.
+  const [interacting, setInteracting] = useState(false)
+  const [committedFullFiles, setCommittedFullFiles] = useState<Map<string, FileDiffMetadata>>(() => new Map())
+  useEffect(() => {
+    setCommittedFullFiles((prev) => settledFullDiffs(prev, fullFiles, interacting))
+  }, [fullFiles, interacting])
   // Ids are derived from the patch-parsed files and carried alongside the
   // (possibly upgraded) diff, so the sidebar and the cards always agree on which
   // entry is which — even when one path has both a staged and an unstaged entry.
@@ -100,9 +112,9 @@ export function App() {
     const ids = buildEntryIds(files)
     return files.map((file) => {
       const key = entryKey(file)
-      return { file: fullFiles.get(key) ?? file, domId: ids.get(key) ?? `file-${file.name}` }
+      return { file: committedFullFiles.get(key) ?? file, domId: ids.get(key) ?? `file-${file.name}` }
     })
-  }, [files, fullFiles])
+  }, [files, committedFullFiles])
 
   const { viewedFiles, setViewed } = useViewed(files)
 
@@ -266,6 +278,7 @@ export function App() {
               onAddComment={addComment}
               onDeleteComment={removeComment}
               onReplyComment={replyToComment}
+              onInteractingChange={setInteracting}
             />
           </Virtualizer>
         </main>

@@ -118,6 +118,24 @@ export function isCommentAnchored(comment: ReviewComment, files: FileDiffMetadat
   return needles.every((needle) => present.has(needle))
 }
 
+/**
+ * Which full-diff upgrades are safe to hand to the diff viewer right now.
+ * Applying one flips `file.isPartial`, which changes a FileDiffCard's key and
+ * forces @pierre/diffs to remount that file's `<FileDiff>` — destroying any
+ * gutter-drag selection or open comment form it (or, under the shared
+ * Virtualizer, a neighboring card) was mid-interaction with. Holding the
+ * previous map isn't a lost upgrade: the caller re-evaluates on every
+ * `latest` change, so the moment `interacting` goes false the newest map is
+ * adopted.
+ */
+export function settledFullDiffs<T>(
+  committed: Map<string, T>,
+  latest: Map<string, T>,
+  interacting: boolean,
+): Map<string, T> {
+  return interacting ? committed : latest
+}
+
 export function fileName(filePath: string): string {
   const parts = filePath.split('/')
   return parts[parts.length - 1]
