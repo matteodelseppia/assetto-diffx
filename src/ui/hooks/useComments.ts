@@ -21,10 +21,7 @@ export async function patchCachedComments(
 }
 
 /** A comment as the reviewer wrote it, before the server assigns it an id. */
-export type NewComment = Pick<
-  ReviewComment,
-  'filePath' | 'side' | 'startLineNumber' | 'lineNumber' | 'lineContents' | 'body'
->
+export type NewComment = Pick<ReviewComment, 'filePath' | 'side' | 'lineNumber' | 'lineContent' | 'body'>
 
 async function fetchComments({ signal }: { signal: AbortSignal }): Promise<ReviewComment[]> {
   const res = await fetch('/api/comments', { signal })

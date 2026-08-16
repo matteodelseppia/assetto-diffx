@@ -30,9 +30,8 @@ The response is a JSON array of comment objects:
     "id": "uuid",
     "filePath": "src/utils/parser.ts",
     "side": "additions",
-    "startLineNumber": 42,
     "lineNumber": 42,
-    "lineContents": ["const x = tokenize(input)"],
+    "lineContent": "const x = tokenize(input)",
     "body": "Rename x to parsedToken for clarity",
     "status": "open",
     "createdAt": 1234567890,
@@ -52,7 +51,7 @@ For each comment with `"status": "open"`, read the whole thread — the `body` p
 #### Change requests (e.g., "Rename x to parsedToken", "Extract this into a helper")
 
 1. Read the file at `filePath`
-2. Find the relevant code using `lineContents` as context
+2. Find the relevant code using `lineContent` as context
 3. Apply the change described in `body`
 4. Reply to the comment explaining what you did, then mark it as resolved:
 
@@ -78,9 +77,7 @@ curl -s -X POST http://localhost:<port>/api/comments/<id>/replies \
   -d '{"body": "A Map would work too, but we use a plain object here because..."}'
 ```
 
-The `side` field tells you whether the comment is on an added line (`additions`) or a deleted line (`deletions`).
-
-A comment can cover a range of lines: `startLineNumber` is its first line and `lineNumber` its last, and `lineContents` holds the content of every line in between. They are equal for a single-line comment.
+The `side` field tells you whether the comment is on an added line (`additions`) or a deleted line (`deletions`). `lineNumber` is the commented line, and `lineContent` is its content.
 
 A reply posted this way is recorded as coming from the agent; the reviewer can answer it from the page, and the thread can go back and forth any number of times.
 

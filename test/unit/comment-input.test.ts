@@ -4,9 +4,8 @@ import { parseCommentInput, parseReplyInput } from '../../src/server.js'
 const valid = {
   filePath: 'src/a.ts',
   side: 'additions',
-  startLineNumber: 1,
   lineNumber: 2,
-  lineContents: ['const a = 1', 'const b = 2'],
+  lineContent: 'const b = 2',
   body: 'why?',
 }
 
@@ -23,27 +22,16 @@ describe('parseCommentInput', () => {
       input: {
         filePath: 'src/a.ts',
         side: 'additions',
-        startLineNumber: 1,
         lineNumber: 2,
-        lineContents: ['const a = 1', 'const b = 2'],
+        lineContent: 'const b = 2',
         body: 'why?',
       },
     })
   })
 
-  it('defaults a single-line comment to a range of one', () => {
-    const result = parseCommentInput({ ...valid, startLineNumber: undefined, lineNumber: 7 })
-    expect(result).toMatchObject({ input: { startLineNumber: 7, lineNumber: 7 } })
-  })
-
-  it('orders the ends of a range selected upwards', () => {
-    const result = parseCommentInput({ ...valid, startLineNumber: 9, lineNumber: 4 })
-    expect(result).toMatchObject({ input: { startLineNumber: 4, lineNumber: 9 } })
-  })
-
-  it('defaults missing line contents to none', () => {
-    const result = parseCommentInput({ ...valid, lineContents: undefined })
-    expect(result).toMatchObject({ input: { lineContents: [] } })
+  it('defaults missing line content to none', () => {
+    const result = parseCommentInput({ ...valid, lineContent: undefined })
+    expect(result).toMatchObject({ input: { lineContent: '' } })
   })
 
   it('rejects a missing or unusable line number', () => {
@@ -51,7 +39,6 @@ describe('parseCommentInput', () => {
     expect(error({ ...valid, lineNumber: 'three' })).toMatch(/lineNumber/)
     expect(error({ ...valid, lineNumber: 1.5 })).toMatch(/lineNumber/)
     expect(error({ ...valid, lineNumber: 0 })).toMatch(/lineNumber/)
-    expect(error({ ...valid, startLineNumber: -1 })).toMatch(/startLineNumber/)
   })
 
   it('rejects a missing or empty file path', () => {
@@ -70,9 +57,9 @@ describe('parseCommentInput', () => {
     expect(error({ ...valid, body: '  ' })).toMatch(/body/)
   })
 
-  it('rejects line contents that are not strings', () => {
-    expect(error({ ...valid, lineContents: 'const a = 1' })).toMatch(/lineContents/)
-    expect(error({ ...valid, lineContents: [1, 2] })).toMatch(/lineContents/)
+  it('rejects line content that is not a string', () => {
+    expect(error({ ...valid, lineContent: 1 })).toMatch(/lineContent/)
+    expect(error({ ...valid, lineContent: ['const a = 1'] })).toMatch(/lineContent/)
   })
 
   it('rejects a payload that is not an object', () => {

@@ -4,7 +4,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { Hono } from 'hono'
 import { getCookie, setCookie } from 'hono/cookie'
 import { serve } from '@hono/node-server'
-import { getGitDiff, getCustomGitDiff, getRangeDiff, getRecentCommits, isKnownCommit, areLinesPresentInWorktree, getRepoName, getBranchName, getFileContent, getBlobContent, getWorktreeFileContent, getTabSizeForFiles, getUntrackedFilePaths } from './git.js'
+import { getGitDiff, getCustomGitDiff, getRangeDiff, getRecentCommits, isKnownCommit, isLinePresentInWorktree, getRepoName, getBranchName, getFileContent, getBlobContent, getWorktreeFileContent, getTabSizeForFiles, getUntrackedFilePaths } from './git.js'
 import { loadSettings, saveSettings } from './settings.js'
 import { InMemoryCommentStore, CommentWatch, awaitingAgent } from './comments.js'
 import type { CommentStore } from './comments.js'
@@ -115,9 +115,8 @@ export function diffContainsFileVersion(patch: string, path: string, oldOid: str
 export interface CommentInput {
   filePath: string
   side: ReviewComment['side']
-  startLineNumber: number
   lineNumber: number
-  lineContents: string[]
+  lineContent: string
   body: string
 }
 
@@ -142,23 +141,16 @@ export function parseCommentInput(payload: unknown): { input: CommentInput } | {
   }
   if (!isNonEmptyString(body.body)) return { error: 'body must be a non-empty string' }
   if (!isLineNumber(body.lineNumber)) return { error: 'lineNumber must be a positive integer' }
-  if (body.startLineNumber !== undefined && !isLineNumber(body.startLineNumber)) {
-    return { error: 'startLineNumber must be a positive integer' }
-  }
-  if (body.lineContents !== undefined && !(Array.isArray(body.lineContents) && body.lineContents.every((line) => typeof line === 'string'))) {
-    return { error: 'lineContents must be an array of strings' }
+  if (body.lineContent !== undefined && typeof body.lineContent !== 'string') {
+    return { error: 'lineContent must be a string' }
   }
 
-  const start = (body.startLineNumber as number | undefined) ?? body.lineNumber
   return {
     input: {
       filePath: body.filePath,
       side: body.side,
-      // A range selected upwards arrives with its ends reversed; the comment is
-      // anchored to the last line either way.
-      startLineNumber: Math.min(start, body.lineNumber),
-      lineNumber: Math.max(start, body.lineNumber),
-      lineContents: (body.lineContents as string[] | undefined) ?? [],
+      lineNumber: body.lineNumber,
+      lineContent: (body.lineContent as string | undefined) ?? '',
       body: body.body,
     },
   }
@@ -470,19 +462,14 @@ export function createApp(
     if ('error' in parsed) {
       return c.json({ error: parsed.error }, 400)
     }
-    const { filePath, side, startLineNumber, lineNumber, lineContents, body: text } = parsed.input
+    const { filePath, side, lineNumber, lineContent, body: text } = parsed.input
     // Comments are handed to a coding agent that works on the working tree, so
     // an added line the reviewer found in an older commit but that no longer
     // exists is not actionable. Deleted lines are exempt: they are absent by
     // definition.
-    if (side === 'additions' && !areLinesPresentInWorktree(filePath, lineContents)) {
+    if (side === 'additions' && !isLinePresentInWorktree(filePath, lineContent)) {
       return c.json(
-        {
-          error:
-            lineContents.length > 1
-              ? 'Some of these lines are no longer part of the latest version of the file, so they cannot be commented on.'
-              : 'This line is no longer part of the latest version of the file, so it cannot be commented on.',
-        },
+        { error: 'This line is no longer part of the latest version of the file, so it cannot be commented on.' },
         409,
       )
     }
@@ -490,9 +477,8 @@ export function createApp(
       id: crypto.randomUUID(),
       filePath,
       side,
-      startLineNumber,
       lineNumber,
-      lineContents,
+      lineContent,
       body: text,
       status: 'open' as const,
       createdAt: Date.now(),

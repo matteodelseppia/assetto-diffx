@@ -75,23 +75,13 @@ export const FileDiffCard = memo(function FileDiffCard({
     return ''
   }
 
-  const getRangeContents = ({ side, startLine, endLine }: CommentTarget): string[] => {
-    const contents: string[] = []
-    for (let line = startLine; line <= endLine; line++) {
-      // Diff lines carry their line ending; a comment quotes the code alone.
-      contents.push(getLineContent(side, line).replace(/\r?\n$/, ''))
-    }
-    return contents
-  }
-
   const allAnnotations: DiffLineAnnotation<ReviewComment | { _pending: true }>[] = [
     ...annotations,
     ...(target
       ? [
           {
             side: target.side,
-            // A range comment hangs below its last line, as on GitHub.
-            lineNumber: target.endLine,
+            lineNumber: target.line,
             metadata: { _pending: true as const },
           },
         ]
@@ -157,18 +147,17 @@ export const FileDiffCard = memo(function FileDiffCard({
             )}
             renderAnnotation={(annotation) => {
               if ('_pending' in annotation.metadata) {
-                const { side, startLine, endLine } = target!
+                const { side, line } = target!
                 return (
                   <CommentForm
-                    startLine={startLine}
-                    endLine={endLine}
+                    line={line}
                     onSubmit={(body) => {
                       onAddComment({
                         filePath,
                         side,
-                        startLineNumber: startLine,
-                        lineNumber: endLine,
-                        lineContents: getRangeContents(target!),
+                        lineNumber: line,
+                        // Diff lines carry their line ending; a comment quotes the code alone.
+                        lineContent: getLineContent(side, line).replace(/\r?\n$/, ''),
                         body,
                       })
                       onTargetChange(filePath, null)

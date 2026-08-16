@@ -10,12 +10,10 @@ export interface ReviewComment {
   id: string
   filePath: string
   side: 'deletions' | 'additions'
-  /** First line of the commented range. Equal to `lineNumber` for a single line. */
-  startLineNumber: number
-  /** Last line of the range — the line the comment is anchored to in the diff. */
+  /** The line the comment is anchored to in the diff. */
   lineNumber: number
-  /** Content of every line of the range, from `startLineNumber` to `lineNumber`. */
-  lineContents: string[]
+  /** Content of the commented line. */
+  lineContent: string
   body: string
   status: 'open' | 'resolved'
   createdAt: number

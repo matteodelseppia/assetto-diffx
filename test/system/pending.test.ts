@@ -28,9 +28,8 @@ function comment(body: string, lineNumber = 1) {
   return {
     filePath: 'src/modified.ts',
     side: 'additions' as const,
-    startLineNumber: lineNumber,
     lineNumber,
-    lineContents: lineNumber === 1 ? ['export const value = 42'] : ['export const other = 2'],
+    lineContent: lineNumber === 1 ? 'export const value = 42' : 'export const other = 2',
     body,
   }
 }

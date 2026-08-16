@@ -67,7 +67,7 @@ export function CommentBubble({ comment, onDelete, onReply }: CommentBubbleProps
     <div className={`comment-bubble ${isResolved ? 'comment-resolved' : ''}`} id={`comment-${comment.id}`}>
       <div className="comment-bubble-header">
         <UserCircle size={18} className="comment-bubble-avatar" />
-        <span className="comment-bubble-lines">{lineLabel(comment.startLineNumber, comment.lineNumber)}</span>
+        <span className="comment-bubble-lines">{lineLabel(comment.lineNumber)}</span>
         <span className="comment-bubble-time">{timeAgo(comment.createdAt)}</span>
         {isResolved && (
           <span className="comment-bubble-resolved">

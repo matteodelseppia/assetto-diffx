@@ -69,7 +69,9 @@ export const DiffViewer = memo(function DiffViewer({
   const handleSelectionChange = useCallback((filePath: string, selection: SelectedLineRange | null) => {
     setActive((prev) => ({
       filePath,
-      selection,
+      // Comments cover a single line: a drag across several is collapsed to
+      // the line it ended on, so the highlight never suggests a range.
+      selection: selection && { ...selection, start: selection.end, side: selection.endSide ?? selection.side },
       target: prev?.filePath === filePath ? prev.target : null,
     }))
   }, [])

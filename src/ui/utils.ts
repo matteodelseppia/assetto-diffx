@@ -1,46 +1,34 @@
 import type { AnnotationSide, FileDiffMetadata, SelectedLineRange } from '@pierre/diffs'
 import type { ReviewComment } from '../types'
 
-/** The span of lines a comment being written covers. */
+/** The line a comment being written covers. */
 export interface CommentTarget {
   side: AnnotationSide
-  startLine: number
-  endLine: number
+  line: number
 }
 
 /**
- * The line range a drag produced, normalised for commenting: ends ordered, and
- * a range dragged across both columns of a split diff — which has no single
- * side to comment on — collapsed to the line the drag ended on.
+ * The line a drag produced, normalised for commenting: a drag that ended on a
+ * different column than it started — which has no single side to comment on
+ * — is anchored to the side and line it ended on.
  */
 export function commentTargetFromRange(range: SelectedLineRange): CommentTarget {
-  const side = range.side ?? 'additions'
-  const endSide = range.endSide ?? side
-  if (side !== endSide) {
-    return { side: endSide, startLine: range.end, endLine: range.end }
-  }
-  return {
-    side,
-    startLine: Math.min(range.start, range.end),
-    endLine: Math.max(range.start, range.end),
-  }
+  return { side: range.endSide ?? range.side ?? 'additions', line: range.end }
 }
 
-/** A span of lines named for the reader: `Line 12` or `Lines 12–16`. */
-export function lineLabel(startLine: number, endLine: number): string {
-  return startLine === endLine ? `Line ${startLine}` : `Lines ${startLine}–${endLine}`
+/** A single line named for the reader: `Line 12`. */
+export function lineLabel(line: number): string {
+  return `Line ${line}`
 }
 
-/** A comment's lines as `12` for a single line and `12-16` for a range. */
+/** A comment's line as `12`. */
 export function lineRange(comment: ReviewComment): string {
-  return comment.startLineNumber === comment.lineNumber
-    ? `${comment.lineNumber}`
-    : `${comment.startLineNumber}-${comment.lineNumber}`
+  return `${comment.lineNumber}`
 }
 
 /**
  * The whole review as the markup a coding agent is handed. Each comment quotes
- * every line it covers, in diff notation, so the agent can locate the code.
+ * the line it covers, in diff notation, so the agent can locate the code.
  */
 export function formatComments(comments: ReviewComment[]): string {
   if (comments.length === 0) return ''
@@ -56,13 +44,9 @@ export function formatComments(comments: ReviewComment[]): string {
   for (const [filePath, fileComments] of grouped) {
     lines.push(`<file path="${filePath}">`)
     for (const comment of fileComments) {
-      const attribute =
-        comment.startLineNumber === comment.lineNumber
-          ? `line="${comment.lineNumber}"`
-          : `lines="${lineRange(comment)}"`
-      lines.push(`<comment ${attribute}>`)
+      lines.push(`<comment line="${comment.lineNumber}">`)
       const prefix = comment.side === 'additions' ? '+' : '-'
-      lines.push(`<code>${comment.lineContents.map((line) => `${prefix} ${line}`).join('\n')}</code>`)
+      lines.push(`<code>${prefix} ${comment.lineContent}</code>`)
       lines.push(comment.body)
       // The thread is part of the request: the agent needs what has already
       // been answered, and what the reviewer replied to it.
@@ -105,17 +89,16 @@ export function truncate(text: string, maxLen: number): string {
  * pointing at whatever now occupies that spot, so anchoring is re-checked by
  * content rather than trusted at the stored line number. Mirrors the
  * whitespace-insensitive membership check the server runs at creation time
- * (`areLinesPresentInWorktree`), so a comment that could be posted can also
+ * (`isLinePresentInWorktree`), so a comment that could be posted can also
  * still be found later.
  */
 export function isCommentAnchored(comment: ReviewComment, files: FileDiffMetadata[]): boolean {
   const file = files.find((f) => f.name === comment.filePath)
   if (!file) return false
   const lines = comment.side === 'additions' ? file.additionLines : file.deletionLines
-  const needles = comment.lineContents.map((line) => line.trim()).filter((line) => line !== '')
-  if (needles.length === 0) return true
-  const present = new Set(lines.map((line) => line.trim()))
-  return needles.every((needle) => present.has(needle))
+  const needle = comment.lineContent.trim()
+  if (needle === '') return true
+  return lines.some((line) => line.trim() === needle)
 }
 
 /**

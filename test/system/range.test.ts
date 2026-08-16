@@ -146,14 +146,13 @@ describe('GET /api/file-content with a selected range', () => {
   })
 })
 
-describe('POST /api/comments on a selected range', () => {
+describe('POST /api/comments against a repository with history', () => {
   it('accepts an added line that still exists in the working tree', async () => {
     const res = await postComment({
       filePath: 'file.ts',
       side: 'additions',
-      startLineNumber: 3,
       lineNumber: 3,
-      lineContents: ['line three'],
+      lineContent: 'line three',
       body: 'still here',
     })
     expect(res.status).toBe(201)
@@ -163,66 +162,20 @@ describe('POST /api/comments on a selected range', () => {
     const res = await postComment({
       filePath: 'file.ts',
       side: 'additions',
-      startLineNumber: 2,
       lineNumber: 2,
-      lineContents: ['line two'],
+      lineContent: 'line two',
       body: 'gone in the latest version',
     })
     expect(res.status).toBe(409)
     expect((await res.json()).error).toMatch(/latest version/)
   })
 
-  it('accepts a range whose every line still exists in the working tree', async () => {
-    const res = await postComment({
-      filePath: 'file.ts',
-      side: 'additions',
-      startLineNumber: 1,
-      lineNumber: 3,
-      lineContents: ['line one', 'line TWO', 'line three'],
-      body: 'the whole file reads oddly',
-    })
-    expect(res.status).toBe(201)
-    const created = await res.json()
-    expect(created.startLineNumber).toBe(1)
-    expect(created.lineNumber).toBe(3)
-    expect(created.lineContents).toEqual(['line one', 'line TWO', 'line three'])
-  })
-
-  it('rejects a range in which one line no longer exists', async () => {
-    const res = await postComment({
-      filePath: 'file.ts',
-      side: 'additions',
-      startLineNumber: 1,
-      lineNumber: 3,
-      lineContents: ['line one', 'line two', 'line three'],
-      body: 'one of these is stale',
-    })
-    expect(res.status).toBe(409)
-    expect((await res.json()).error).toMatch(/no longer part of the latest version/)
-  })
-
-  it('orders the ends of a range that was selected upwards', async () => {
-    const res = await postComment({
-      filePath: 'file.ts',
-      side: 'additions',
-      startLineNumber: 3,
-      lineNumber: 1,
-      lineContents: ['line three', 'line TWO', 'line one'],
-      body: 'dragged bottom to top',
-    })
-    expect(res.status).toBe(201)
-    const created = await res.json()
-    expect(created.startLineNumber).toBe(1)
-    expect(created.lineNumber).toBe(3)
-  })
-
   it('rejects a comment on a file that no longer exists', async () => {
     const res = await postComment({
       filePath: 'deleted.ts',
       side: 'additions',
-      startLineNumber: 1,
       lineNumber: 1,
-      lineContents: ['line one'],
+      lineContent: 'line one',
       body: 'gone',
     })
     expect(res.status).toBe(409)
@@ -232,22 +185,9 @@ describe('POST /api/comments on a selected range', () => {
     const res = await postComment({
       filePath: 'file.ts',
       side: 'deletions',
-      startLineNumber: 2,
       lineNumber: 2,
-      lineContents: ['line two'],
+      lineContent: 'line two',
       body: 'why was this changed?',
-    })
-    expect(res.status).toBe(201)
-  })
-
-  it('still accepts a range of deleted lines', async () => {
-    const res = await postComment({
-      filePath: 'file.ts',
-      side: 'deletions',
-      startLineNumber: 1,
-      lineNumber: 2,
-      lineContents: ['line one', 'line two'],
-      body: 'both of these went away',
     })
     expect(res.status).toBe(201)
   })

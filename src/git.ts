@@ -173,19 +173,17 @@ export function getRangeDiff(base: string, head?: string): string {
 }
 
 /**
- * Whether every one of `lineContents` still exists in the working-tree version
- * of the file. Comments are handed to a coding agent that edits the working
- * tree, so a comment on code that only exists in an older commit is not
- * actionable — and for a range comment that holds for each line it covers.
- * Blank lines carry no content to match, so only the file has to exist.
+ * Whether `lineContent` still exists in the working-tree version of the file.
+ * Comments are handed to a coding agent that edits the working tree, so a
+ * comment on code that only exists in an older commit is not actionable. A
+ * blank line carries no content to match, so only the file has to exist.
  */
-export function areLinesPresentInWorktree(filePath: string, lineContents: string[]): boolean {
+export function isLinePresentInWorktree(filePath: string, lineContent: string): boolean {
   const content = getWorktreeFileContent(filePath)
   if (content == null) return false
-  const needles = lineContents.map((line) => line.trim()).filter((line) => line !== '')
-  if (needles.length === 0) return true
-  const present = new Set(content.split('\n').map((line) => line.trim()))
-  return needles.every((needle) => present.has(needle))
+  const needle = lineContent.trim()
+  if (needle === '') return true
+  return content.split('\n').some((line) => line.trim() === needle)
 }
 
 export function getGitDiff(options: { staged?: boolean; untracked?: boolean } = {}): string {
